@@ -11,7 +11,7 @@ WattWitness is a system that measures solar power generation, signs the data usi
 - Shelly EM with 50A Clamp
 - Adafruit ATECC608 Breakout Board
 - ESP32 WLAN Dev Kit Board
-- Raspberry Pi 4
+- Raspberry Pi 4 (runs the backend and serves the dashboard)
 
 ## System Architecture
 
@@ -22,11 +22,14 @@ The system consists of several key components:
    - ESP32 for data processing
    - ATECC608 for secure data signing
 
-2. **Monitoring System (Raspberry Pi)**
-   - Real-time data visualization
+2. **Raspberry Pi System**
+   - FastAPI backend server
+   - PostgreSQL database
+   - React dashboard server
    - Data storage and backup
    - System status monitoring
    - Alert management
+   - Blockchain transaction management
 
 3. **Blockchain Integration**
    - Chainlink Functions for data verification
@@ -38,7 +41,17 @@ The system consists of several key components:
 ```
 wattwitness/
 ├── firmware/           # ESP32 code
-├── backend/           # Raspberry Pi monitoring
+├── backend/           # FastAPI backend (runs on Raspberry Pi)
+│   ├── app/
+│   │   ├── api/      # API endpoints
+│   │   ├── db/       # Database models
+│   │   └── core/     # Core functionality
+│   └── tests/        # Backend tests
+├── frontend/         # React dashboard (served by Raspberry Pi)
+│   ├── src/
+│   │   ├── components/  # React components
+│   │   └── App.tsx     # Main application
+│   └── public/         # Static assets
 ├── smart-contracts/   # Blockchain integration
 ├── docs/             # Documentation
 └── tests/            # Test suites
@@ -49,10 +62,10 @@ wattwitness/
 ### Prerequisites
 
 - Python 3.8+
-- Node.js 14+
-- ESP-IDF
+- Node.js 18+
 - PostgreSQL
 - Docker (optional)
+- Raspberry Pi 4 (for production deployment)
 
 ### Installation
 
@@ -77,15 +90,64 @@ wattwitness/
 
 3. Configure the environment:
    ```bash
+   # Backend
+   cd backend
+   cp .env.example .env
+   # Edit .env with your configuration
+
+   # Frontend
+   cd frontend
    cp .env.example .env
    # Edit .env with your configuration
    ```
 
 ## Development
 
-- Backend: `cd backend && python main.py`
-- Frontend: `cd frontend && npm start`
-- Smart Contracts: `cd smart-contracts && npx hardhat node`
+### Backend (Raspberry Pi)
+```bash
+cd backend
+python -m uvicorn main:app --reload
+```
+
+### Frontend (Development)
+```bash
+cd frontend
+npm run dev
+```
+
+### Production Deployment (Raspberry Pi)
+```bash
+# Build frontend
+cd frontend
+npm run build
+
+# Start backend (with frontend served)
+cd backend
+python -m uvicorn main:app --host 0.0.0.0 --port 8000
+```
+
+### Smart Contracts
+```bash
+cd smart-contracts
+npx hardhat node
+```
+
+## Features
+
+### Backend (Raspberry Pi)
+- FastAPI-based REST API
+- PostgreSQL database integration
+- Real-time power data ingestion
+- Hardware signature verification
+- Blockchain transaction management
+- Serves the React dashboard
+
+### Frontend
+- Real-time power monitoring dashboard
+- System status visualization
+- Historical data charts
+- Blockchain verification status
+- Dark mode UI with Material-UI
 
 ## Testing
 
