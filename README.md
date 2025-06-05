@@ -8,9 +8,9 @@ WattWitness is a system that measures solar power generation, signs the data usi
 
 ## Hardware Components
 
-- Shelly EM with 50A Clamp
-- Adafruit ATECC608 Breakout Board
-- ESP32 WLAN Dev Kit Board
+- Shelly EM with 50A Clamp (Electricity Meter)
+- Adafruit ATECC608 Breakout Board (signs reading)
+- ESP32 WLAN Dev Kit Board (Recieves reading from Shelly)
 - Raspberry Pi 4 (runs the backend and serves the dashboard)
 
 ## System Architecture
@@ -30,11 +30,53 @@ The system consists of several key components:
    - System status monitoring
    - Alert management
    - Blockchain transaction management
+   - Offline data storage and synchronization
 
 3. **Blockchain Integration**
    - Chainlink Functions for data verification
    - Avalanche blockchain integration
    - Smart contract implementation
+
+## Data Flow and Storage Strategy
+
+### Local Storage
+1. **Real-time Data**
+   - Power readings are stored in PostgreSQL database
+   - Each reading includes hardware signature and timestamp
+   - Data is immediately available for dashboard display
+
+2. **Offline Operation**
+   - System continues to collect and store data when offline
+   - PostgreSQL ensures data integrity during power outages
+   - Automatic synchronization when internet connection is restored
+
+### Blockchain Integration
+1. **Data Aggregation**
+   - Power readings are aggregated into daily totals
+   - Aggregated data is signed by the Raspberry Pi
+   - Batch processing reduces blockchain transaction costs
+
+2. **Smart Contract Integration**
+   - Chainlink Functions pull aggregated data from Raspberry Pi API
+   - Data is verified before being written to the blockchain
+   - Smart contract stores:
+     - Daily power production totals
+     - Hardware signatures
+     - Timestamps
+     - Verification status
+
+### API Endpoints for Blockchain Integration
+```bash
+# Get aggregated power data for blockchain
+GET /api/v1/readings/aggregated
+  - start_date: ISO date
+  - end_date: ISO date
+  - installation_id: string
+
+# Get verification status
+GET /api/v1/readings/verification
+  - blockchain_tx_hash: string
+```
 
 ## Project Structure
 
