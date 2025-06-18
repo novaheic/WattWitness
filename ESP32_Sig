@@ -1,13 +1,91 @@
 #include <Wire.h>
+#include <WiFi.h>
+#include <HTTPClient.h>
 #include <Arduino.h>
 #include <ArduinoECCX08.h>
+
+// WiFi credentials
+const char* ssid = "Ondemand";           // <-- CHANGE THIS
+const char* password = "CasaBerlin";   // <-- CHANGE THIS
+const char* shellyHost = "192.168.178.156"; // <-- CHANGE THIS
+
+void fetchAndSignTelemetry() {
+  HTTPClient http;
+  String url = String("http://") + shellyHost + "/status";
+  http.begin(url);
+  int httpCode = http.GET();
+  if (httpCode != 200) {
+    Serial.println("❌ Failed to fetch ShellyEM data.");
+    http.end();
+    return;
+  }
+
+  String payload = http.getString();
+  http.end();
+
+  Serial.println("📦 Shelly payload:");
+  Serial.println(payload);
+
+  float power = 0.0;
+  float total_kwh = 0.0;
+  long timestamp = 0;
+
+  int pIndex = payload.indexOf("\"power\":");
+  if (pIndex != -1) {
+    power = payload.substring(pIndex + 8).toFloat();
+  }
+
+  int tIndex = payload.indexOf("\"total\":");
+  if (tIndex != -1) {
+    total_kwh = payload.substring(tIndex + 8).toFloat();
+  }
+
+  float total_wh = total_kwh * 1000.0;
+
+  int tsIndex = payload.indexOf("\"unixtime\":");
+  if (tsIndex != -1) {
+    timestamp = payload.substring(tsIndex + 11).toInt();
+  }
+
+  char message[64];
+  snprintf(message, sizeof(message), "ShellyEM power=%.1fW total=%.1fWh timestamp=%ld", power, total_wh, timestamp);
+  Serial.print("📊 Data: ");
+  Serial.println(message);
+
+  // Sign message
+  char padded[64] = {0};
+  strncpy(padded, message, sizeof(padded));
+
+  uint8_t signature[64];
+
+  if (ECCX08.beginSHA256()) {
+    ECCX08.updateSHA256((const byte*)padded);
+    if (ECCX08.endSHA256(signature)) {
+      Serial.print("✍️ Signature: ");
+      for (int i = 0; i < 64; i++) {
+        if (signature[i] < 0x10) Serial.print("0");
+        Serial.print(signature[i], HEX);
+      }
+      Serial.println();
+    } else {
+      Serial.println("❌ SHA256 + Sign failed");
+    }
+  }
+}
 
 void setup() {
   Serial.begin(115200);
   delay(1000);
-  Serial.println("🔐 WattWitness: SHA256 Signing Test");
+  Serial.println("🔐 WattWitness: Live Signing Mode");
 
-  Wire.begin(21, 22);  // ESP32 custom pins
+  WiFi.begin(ssid, password);
+  Serial.print("📶 Connecting to WiFi");
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500); Serial.print(".");
+  }
+  Serial.println("\n✅ WiFi connected");
+
+  Wire.begin(21, 22);
   Wire.setClock(400000);
 
   if (!ECCX08.begin()) {
@@ -15,41 +93,9 @@ void setup() {
     while (1);
   }
   Serial.println("✅ ATECC608A initialized.");
-
-  const char* message = "ShellyEM total=237.8Wh timestamp=1718715300";
-  Serial.print("📊 Data: ");
-  Serial.println(message);
-
-  char padded[64] = {0};
-  strncpy(padded, message, sizeof(padded)); // pad to 64 bytes
-
-  uint8_t signature[64];
-
-  if (ECCX08.beginSHA256()) {
-    ECCX08.updateSHA256((const byte*)padded);
-    ECCX08.endSHA256(signature);
-
-    Serial.print("✍️ Signature: ");
-    for (int i = 0; i < 64; i++) {
-      if (signature[i] < 0x10) Serial.print("0");
-      Serial.print(signature[i], HEX);
-    }
-    Serial.println();
-  } else {
-    Serial.println("❌ SHA256 + Sign failed");
-  }
-  // Extract and print the public key from slot 0
-uint8_t publicKey[64];
-if (ECCX08.generatePublicKey(0, publicKey)) {
-  Serial.print("📤 Public Key: ");
-  for (int i = 0; i < 64; i++) {
-    if (publicKey[i] < 0x10) Serial.print("0");
-    Serial.print(publicKey[i], HEX);
-  }
-  Serial.println();
-} else {
-  Serial.println("❌ Failed to get public key.");
-}
 }
 
-void loop() {}
+void loop() {
+  fetchAndSignTelemetry();
+  delay(10000); // wait 10 seconds before repeating
+}
