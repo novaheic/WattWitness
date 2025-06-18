@@ -1,0 +1,55 @@
+#include <Wire.h>
+#include <Arduino.h>
+#include <ArduinoECCX08.h>
+
+void setup() {
+  Serial.begin(115200);
+  delay(1000);
+  Serial.println("🔐 WattWitness: SHA256 Signing Test");
+
+  Wire.begin(21, 22);  // ESP32 custom pins
+  Wire.setClock(400000);
+
+  if (!ECCX08.begin()) {
+    Serial.println("❌ ATECC608A not found.");
+    while (1);
+  }
+  Serial.println("✅ ATECC608A initialized.");
+
+  const char* message = "ShellyEM total=237.8Wh timestamp=1718715300";
+  Serial.print("📊 Data: ");
+  Serial.println(message);
+
+  char padded[64] = {0};
+  strncpy(padded, message, sizeof(padded)); // pad to 64 bytes
+
+  uint8_t signature[64];
+
+  if (ECCX08.beginSHA256()) {
+    ECCX08.updateSHA256((const byte*)padded);
+    ECCX08.endSHA256(signature);
+
+    Serial.print("✍️ Signature: ");
+    for (int i = 0; i < 64; i++) {
+      if (signature[i] < 0x10) Serial.print("0");
+      Serial.print(signature[i], HEX);
+    }
+    Serial.println();
+  } else {
+    Serial.println("❌ SHA256 + Sign failed");
+  }
+  // Extract and print the public key from slot 0
+uint8_t publicKey[64];
+if (ECCX08.generatePublicKey(0, publicKey)) {
+  Serial.print("📤 Public Key: ");
+  for (int i = 0; i < 64; i++) {
+    if (publicKey[i] < 0x10) Serial.print("0");
+    Serial.print(publicKey[i], HEX);
+  }
+  Serial.println();
+} else {
+  Serial.println("❌ Failed to get public key.");
+}
+}
+
+void loop() {}
