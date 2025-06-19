@@ -14,17 +14,17 @@ WattWitness is a Trustless Tamperproof Electricity Production Meter system for s
 - **Raspberry Pi**
   - Receives verified data from secure hardware
   - Runs monitoring dashboard
-  - Communicates with backend server
+  - Communicates with blockchain
 
 ### 2. Software Components
 
 #### Directory Structure
 ```
 wattwitness/
-├── firmware/           # ESP32 code
-│   └── ESP32_Sig       # ESP32 signature code
-├── dashboard/          # Dashboard and API
-│   ├── backend/        # FastAPI backend
+├── ESPfirmware/           # ESP32 code
+│   └── ESP32_Sig          # ESP32 signature code
+├── RaspberryPi/           # Dashboard and API
+│   ├── backend/           # FastAPI backend
 │   │   ├── app/
 │   │   │   ├── api/       # API endpoints
 │   │   │   ├── db/        # Database models

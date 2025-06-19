@@ -82,16 +82,16 @@ GET /api/v1/readings/verification
 
 ```
 wattwitness/
-├── firmware/           # ESP32 code
-│   └── ESP32_Sig       # ESP32 signature code
-├── dashboard/          # Dashboard and API
-│   ├── backend/        # FastAPI backend (runs on Raspberry Pi)
+├── ESPfirmware/           # ESP32 code
+│   └── ESP32_Sig          # ESP32 signature code
+├── RaspberryPi/           # Dashboard and API
+│   ├── backend/           # FastAPI backend (runs on Raspberry Pi)
 │   │   ├── app/
 │   │   │   ├── api/      # API endpoints
 │   │   │   ├── db/       # Database models
 │   │   │   └── core/     # Core functionality
 │   │   └── tests/        # Backend tests
-│   └── frontend/       # React dashboard (served by Raspberry Pi)
+│   └── frontend/         # React dashboard (served by Raspberry Pi)
 │       ├── src/
 │       │   ├── components/  # React components
 │       │   └── App.tsx     # Main application
@@ -121,25 +121,25 @@ wattwitness/
 2. Set up the development environment:
    ```bash
    # Backend setup
-   cd dashboard/backend
+   cd RaspberryPi/backend
    python -m venv venv
    source venv/bin/activate  # On Windows: venv\Scripts\activate
    pip install -r requirements.txt
 
    # Frontend setup
-   cd dashboard/frontend
+   cd RaspberryPi/frontend
    npm install
    ```
 
 3. Configure the environment:
    ```bash
    # Backend
-   cd dashboard/backend
+   cd RaspberryPi/backend
    cp .env.example .env
    # Edit .env with your configuration
 
    # Frontend
-   cd dashboard/frontend
+   cd RaspberryPi/frontend
    cp .env.example .env
    # Edit .env with your configuration
    ```
@@ -148,24 +148,24 @@ wattwitness/
 
 ### Backend (Raspberry Pi)
 ```bash
-cd dashboard/backend
+cd RaspberryPi/backend
 python -m uvicorn main:app --reload
 ```
 
 ### Frontend (Development)
 ```bash
-cd dashboard/frontend
+cd RaspberryPi/frontend
 npm run dev
 ```
 
 ### Production Deployment (Raspberry Pi)
 ```bash
 # Build frontend
-cd dashboard/frontend
+cd RaspberryPi/frontend
 npm run build
 
 # Start backend (with frontend served)
-cd dashboard/backend
+cd RaspberryPi/backend
 python -m uvicorn main:app --host 0.0.0.0 --port 8000
 ```
 
