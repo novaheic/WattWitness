@@ -5,8 +5,8 @@
 #include <ArduinoECCX08.h>
 
 // WiFi credentials
-const char* ssid = "Ondemand";           // <-- CHANGE THIS
-const char* password = "";   // <-- CHANGE THIS
+const char* ssid = "Ondemand";            // <-- CHANGE THIS
+const char* password = "CasaBerlin";      // <-- CHANGE THIS
 const char* shellyHost = "192.168.178.156"; // <-- CHANGE THIS
 
 void fetchAndSignTelemetry() {
@@ -93,6 +93,19 @@ void setup() {
     while (1);
   }
   Serial.println("✅ ATECC608A initialized.");
+
+  // 🔓 Print the public key ONCE at startup
+  uint8_t publicKey[64];
+  if (ECCX08.generatePublicKey(0, publicKey)) {
+    Serial.println("📤 Public Key:");
+    for (int i = 0; i < 64; i++) {
+      if (publicKey[i] < 0x10) Serial.print("0");
+      Serial.print(publicKey[i], HEX);
+    }
+    Serial.println();
+  } else {
+    Serial.println("❌ Failed to get public key.");
+  }
 }
 
 void loop() {
