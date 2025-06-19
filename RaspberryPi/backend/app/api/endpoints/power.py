@@ -53,12 +53,35 @@ class PowerReadingResponse(BaseModel):
 def extract_shelly_mac(shelly_payload: str) -> str:
     """Extract MAC address from ShellyEM JSON payload (base64 encoded)"""
     try:
+        # Add padding if needed
+        padding = 4 - (len(shelly_payload) % 4)
+        if padding != 4:
+            shelly_payload += "=" * padding
+        
+        print(f"Attempting to decode base64 payload (length: {len(shelly_payload)})")
+        
         # Decode base64 payload
-        decoded_payload = base64.b64decode(shelly_payload).decode('utf-8')
+        decoded_bytes = base64.b64decode(shelly_payload)
+        print(f"Decoded {len(decoded_bytes)} bytes")
+        
+        # Try to decode as UTF-8
+        try:
+            decoded_payload = decoded_bytes.decode('utf-8')
+            print(f"Decoded as UTF-8: {decoded_payload[:100]}...")  # First 100 chars
+        except UnicodeDecodeError as e:
+            print(f"UTF-8 decode failed: {e}")
+            print(f"Raw bytes (hex): {decoded_bytes[:50].hex()}...")  # First 50 bytes as hex
+            return ""
+        
+        # Parse JSON
         data = json.loads(decoded_payload)
-        return data.get("mac", "")
+        mac = data.get("mac", "")
+        print(f"Successfully extracted MAC: {mac}")
+        return mac
+        
     except Exception as e:
         print(f"Error extracting MAC: {e}")
+        print(f"Input payload: {shelly_payload[:50]}...")  # First 50 chars
         return ""
 
 @router.post("/installations/")

@@ -1,3 +1,46 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html, body {
+    @apply w-full m-0 p-0;
+  }
+  
+  body {
+    @apply bg-gray-100;
+  }
+
+  #root {
+    @apply w-full;
+  }
+}
+
+@layer components {
+  .card {
+    @apply bg-white rounded-lg shadow-md p-6;
+  }
+  
+  /* Override default button focus styles for dropdown options */
+  .dropdown-option:focus,
+  .dropdown-option:focus-visible {
+    outline: none !important;
+  }
+}
+
+/* Override any button focus styles with high specificity */
+button:focus,
+button:focus-visible,
+button:hover:focus,
+button:hover:focus-visible,
+button:active:focus,
+button:active:focus-visible {
+  outline: none !important;
+  border: none !important;
+  box-shadow: none !important;
+  -webkit-focus-ring-color: transparent !important;
+}
+
 :root {
   font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
   line-height: 1.5;
@@ -51,7 +94,7 @@ button:hover {
 }
 button:focus,
 button:focus-visible {
-  outline: 4px auto -webkit-focus-ring-color;
+  outline: none;
 }
 
 @media (prefers-color-scheme: light) {
