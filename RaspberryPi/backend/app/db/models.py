@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, Float, String, DateTime, ForeignKey, Boolean
+from sqlalchemy import Column, Integer, Float, String, DateTime, ForeignKey, Boolean, BigInteger
 from sqlalchemy.orm import relationship
 from sqlalchemy.ext.declarative import declarative_base
 from datetime import datetime
@@ -9,13 +9,11 @@ class SolarInstallation(Base):
     __tablename__ = "solar_installations"
 
     id = Column(Integer, primary_key=True, index=True)
-    name = Column(String, index=True)
-    location = Column(String)
-    capacity_kw = Column(Float)
-    installation_date = Column(DateTime, default=datetime.utcnow)
+    name = Column(String, index=True)  # e.g., "Hackathon Test 1"
+    shelly_mac = Column(String, unique=True)  # MAC address from ShellyEM
+    public_key = Column(String, unique=True)  # Public key from ESP32
+    created_at = Column(DateTime, default=datetime.utcnow)
     is_active = Column(Boolean, default=True)
-    public_key = Column(String, unique=True)  # For blockchain integration
-    hardware_id = Column(String, unique=True)  # ID of the secure hardware
     
     # Relationships
     power_readings = relationship("PowerReading", back_populates="installation")
@@ -26,14 +24,12 @@ class PowerReading(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     installation_id = Column(Integer, ForeignKey("solar_installations.id"))
-    timestamp = Column(DateTime, default=datetime.utcnow)
-    power_kw = Column(Float)
-    voltage_v = Column(Float)
-    current_a = Column(Float)
-    temperature_c = Column(Float)
+    power_w = Column(Float)  # Power in watts (from ESP32)
+    total_wh = Column(Float)  # Total energy in watt-hours (from ESP32)
+    timestamp = Column(BigInteger)  # Unix timestamp (from ESP32)
+    signature = Column(String)  # Cryptographic signature (from ESP32)
     
     # Verification fields
-    hardware_signature = Column(String)  # Signature from secure hardware
     is_verified = Column(Boolean, default=False)
     verification_timestamp = Column(DateTime)
     
@@ -41,6 +37,9 @@ class PowerReading(Base):
     blockchain_tx_hash = Column(String, unique=True)  # Transaction hash on blockchain
     blockchain_block_number = Column(Integer)  # Block number where data is stored
     is_on_chain = Column(Boolean, default=False)
+    
+    # Metadata
+    created_at = Column(DateTime, default=datetime.utcnow)
     
     # Relationships
     installation = relationship("SolarInstallation", back_populates="power_readings")
@@ -56,25 +55,4 @@ class Token(Base):
     transaction_hash = Column(String)  # Blockchain transaction hash
     
     # Relationships
-    installation = relationship("SolarInstallation", back_populates="tokens")
-
-class PowerMeasurement(Base):
-    __tablename__ = "power_measurements"
-
-    id = Column(Integer, primary_key=True, index=True)
-    timestamp = Column(DateTime, default=datetime.utcnow, nullable=False)
-    power_value = Column(Float, nullable=False)
-    device_id = Column(String, nullable=False)
-    signature = Column(String, nullable=False)
-    is_verified = Column(Boolean, default=False)
-
-class SystemStatus(Base):
-    __tablename__ = "system_status"
-
-    id = Column(Integer, primary_key=True, index=True)
-    timestamp = Column(DateTime, default=datetime.utcnow, nullable=False)
-    device_id = Column(String, nullable=False)
-    status = Column(String, nullable=False)  # online, offline, error
-    details = Column(String, nullable=True)
-    hardware_status = Column(String, nullable=True)  # Status of secure hardware
-    last_verification = Column(DateTime, nullable=True)  # Last successful verification 
+    installation = relationship("SolarInstallation", back_populates="tokens") 

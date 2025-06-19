@@ -3,11 +3,72 @@
 #include <HTTPClient.h>
 #include <Arduino.h>
 #include <ArduinoECCX08.h>
+#include <base64.h>
 
 // WiFi credentials
 const char* ssid = "Ondemand";            // <-- CHANGE THIS
 const char* password = "CasaBerlin";      // <-- CHANGE THIS
 const char* shellyHost = "192.168.178.156"; // <-- CHANGE THIS
+const char* backendHost = "192.168.178.152"; // <-- CHANGE THIS
+
+bool initialSetupSent = false;
+
+void sendInitialSetup() {
+  if (initialSetupSent) return;
+  
+  HTTPClient http;
+  String url = String("http://") + backendHost + ":8000/api/v1/installations/";
+  http.begin(url);
+  http.addHeader("Content-Type", "application/json");
+  
+  // Get the public key
+  uint8_t publicKey[64];
+  if (!ECCX08.generatePublicKey(0, publicKey)) {
+    Serial.println("❌ Failed to get public key for initial setup");
+    return;
+  }
+  
+  // Convert public key to hex string
+  String publicKeyHex = "";
+  for (int i = 0; i < 64; i++) {
+    if (publicKey[i] < 0x10) publicKeyHex += "0";
+    publicKeyHex += String(publicKey[i], HEX);
+  }
+  
+  // Get ShellyEM data for MAC address
+  String shellyUrl = String("http://") + shellyHost + "/status";
+  HTTPClient shellyHttp;
+  shellyHttp.begin(shellyUrl);
+  int shellyCode = shellyHttp.GET();
+  if (shellyCode != 200) {
+    Serial.println("❌ Failed to fetch ShellyEM data for initial setup");
+    shellyHttp.end();
+    return;
+  }
+  String shellyPayload = shellyHttp.getString();
+  shellyHttp.end();
+  
+  // Base64 encode the ShellyEM payload
+  String encodedPayload = base64::encode(shellyPayload);
+  
+  // Prepare JSON payload for initial setup
+  String jsonPayload = "{";
+  jsonPayload += "\"name\":\"Hackathon Test 1\",";
+  jsonPayload += "\"public_key\":\"" + publicKeyHex + "\",";
+  jsonPayload += "\"shelly_payload\":\"" + encodedPayload + "\"";
+  jsonPayload += "}";
+  
+  int postCode = http.POST(jsonPayload);
+  if (postCode > 0) {
+    Serial.printf("✅ Initial setup sent! Response code: %d\n", postCode);
+    String response = http.getString();
+    Serial.println(response);
+    initialSetupSent = true;
+  } else {
+    Serial.printf("❌ Failed to send initial setup. Error: %s\n", http.errorToString(postCode).c_str());
+  }
+  http.end();
+}
 
 void fetchAndSignTelemetry() {
   HTTPClient http;
@@ -67,6 +128,37 @@ void fetchAndSignTelemetry() {
         Serial.print(signature[i], HEX);
       }
       Serial.println();
+
+      // Base64 encode the ShellyEM payload for readings
+      String encodedPayload = base64::encode(payload);
+      // Prepare JSON payload for reading
+      String jsonPayload = "{";
+      jsonPayload += "\"power\":" + String(power, 2) + ",";
+      jsonPayload += "\"total\":" + String(total_wh, 2) + ",";
+      jsonPayload += "\"timestamp\":" + String(timestamp) + ",";
+      jsonPayload += "\"signature\":\"";
+      for (int i = 0; i < 64; i++) {
+        if (signature[i] < 0x10) jsonPayload += "0";
+        jsonPayload += String(signature[i], HEX);
+      }
+      jsonPayload += "\",";
+      jsonPayload += "\"shelly_payload\":\"" + encodedPayload + "\"";
+      jsonPayload += "}";
+
+      // Send to backend
+      HTTPClient postHttp;
+      String backendUrl = String("http://") + backendHost + ":8000/api/v1/readings/";
+      postHttp.begin(backendUrl);
+      postHttp.addHeader("Content-Type", "application/json");
+      int postCode = postHttp.POST(jsonPayload);
+      if (postCode > 0) {
+        Serial.printf("✅ Sent to backend! Response code: %d\n", postCode);
+        String response = postHttp.getString();
+        Serial.println(response);
+      } else {
+        Serial.printf("❌ Failed to send to backend. Error: %s\n", postHttp.errorToString(postCode).c_str());
+      }
+      postHttp.end();
     } else {
       Serial.println("❌ SHA256 + Sign failed");
     }
@@ -106,6 +198,10 @@ void setup() {
   } else {
     Serial.println("❌ Failed to get public key.");
   }
+  
+  // Send initial setup
+  Serial.println("🚀 Sending initial setup...");
+  sendInitialSetup();
 }
 
 void loop() {
