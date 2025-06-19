@@ -1,213 +1,175 @@
 # WattWitness
 
-A Trustless Tamperproof Electricity Production Meter for solar park tokenization.
+A Trustless Tamperproof Electricity Production Meter system for solar park tokenization. Ensures verifiable and immutable power production data through secure hardware measurements and blockchain integration.
 
-## Project Overview
+## 🚀 Current Status
 
-WattWitness is a system that measures solar power generation, signs the data using secure hardware, and pushes that signed data on-chain via an oracle. This project is being developed for a three-week hackathon.
+**✅ WORKING SYSTEM - ESP32 to Backend Integration Complete**
 
-## Hardware Components
+The system is currently operational with:
+- ESP32 collecting and signing power data from ShellyEM
+- FastAPI backend storing verified readings in PostgreSQL
+- Real-time data flow every 10 seconds
 
-- Shelly EM with 50A Clamp (Electricity Meter)
-- Adafruit ATECC608 Breakout Board (signs reading)
-- ESP32 WLAN Dev Kit Board (Recieves reading from Shelly)
-- Raspberry Pi 4 (runs the backend and serves the dashboard)
+## 📡 API Access
 
-## System Architecture
+**Backend URL:** `http://192.168.178.152:8000`  
+**API Documentation:** `http://192.168.178.152:8000/docs`
 
-The system consists of several key components:
+### Available Endpoints
 
-1. **Power Measurement System**
-   - Shelly EM for accurate power measurement
-   - ESP32 for data processing
-   - ATECC608 for secure data signing
+#### Installations (Setup)
+- `POST /api/v1/installations/` - Creates/updates installation
+- Payload: `{"name": "Hackathon Test 1", "public_key": "...", "shelly_payload": "base64_encoded_json"}`
 
-2. **Raspberry Pi System**
-   - FastAPI backend server
-   - PostgreSQL database
-   - React dashboard server
-   - Data storage and backup
-   - System status monitoring
-   - Alert management
-   - Blockchain transaction management
-   - Offline data storage and synchronization
+#### Power Readings
+- `POST /api/v1/readings/` - Stores power readings
+- Payload: `{"power": 16.6, "total": 21700.0, "timestamp": 1750352712, "signature": "...", "shelly_payload": "base64_encoded_json"}`
+- `GET /api/v1/readings/{installation_id}` - Get readings for installation
+- `GET /api/v1/readings/latest/{installation_id}` - Get latest reading
 
-3. **Blockchain Integration**
-   - Chainlink Functions for data verification
-   - Avalanche blockchain integration
-   - Smart contract implementation
+### Data Structure
 
-## Data Flow and Storage Strategy
-
-### Local Storage
-1. **Real-time Data**
-   - Power readings are stored in PostgreSQL database
-   - Each reading includes hardware signature and timestamp
-   - Data is immediately available for dashboard display
-
-2. **Offline Operation**
-   - System continues to collect and store data when offline
-   - PostgreSQL ensures data integrity during power outages
-   - Automatic synchronization when internet connection is restored
-
-### Blockchain Integration
-1. **Data Aggregation**
-   - Power readings are aggregated into daily totals
-   - Aggregated data is signed by the Raspberry Pi
-   - Batch processing reduces blockchain transaction costs
-
-2. **Smart Contract Integration**
-   - Chainlink Functions pull aggregated data from Raspberry Pi API
-   - Data is verified before being written to the blockchain
-   - Smart contract stores:
-     - Daily power production totals
-     - Hardware signatures
-     - Timestamps
-     - Verification status
-
-### API Endpoints for Blockchain Integration
-```bash
-# Get aggregated power data for blockchain
-GET /api/v1/readings/aggregated
-  - start_date: ISO date
-  - end_date: ISO date
-  - installation_id: string
-
-# Get verification status
-GET /api/v1/readings/verification
-  - blockchain_tx_hash: string
+#### Installation
+```json
+{
+  "id": 1,
+  "name": "Hackathon Test 1",
+  "shelly_mac": "EC64C9C05E97",
+  "public_key": "fca0c973d117630908020a530be5d137bc9e11baccf9a3d4f666cf3b56a4edaf07056e97405e803418011c7e62f255a4fb053cdd75d4abbad41b013b37d8d8c4",
+  "created_at": "2025-06-19T16:52:26.093539",
+  "is_active": true
+}
 ```
 
-## Project Structure
+#### Power Reading
+```json
+{
+  "id": 1,
+  "installation_id": 1,
+  "power_w": 16.6,
+  "total_wh": 21700.0,
+  "timestamp": 1750352712,
+  "signature": "2F2B15C626527E957F49D2D7663A91ECCC7B8220C401598515282EA9EC6FA61000000000000000005C20FB04000000000000000000000000D020FB0000000000",
+  "is_verified": true,
+  "created_at": "2025-06-19T16:52:26.093539"
+}
+```
 
+## 🔗 Integration Guide for Teammates
+
+### For Chainlink Integration
+
+**What you need to do:**
+1. **Read from API:** Fetch unprocessed readings (those without `blockchain_tx_hash`)
+2. **Verify signatures:** Use the public key to verify the cryptographic signatures
+3. **Submit to blockchain:** Use Chainlink Functions to write verified data
+4. **Update database:** Mark readings as `is_on_chain: true` with transaction hash
+
+**Key fields for blockchain:**
+- `power_w` (watts)
+- `total_wh` (watt-hours)
+- `timestamp` (Unix timestamp)
+- `signature` (for verification)
+
+### Testing the API
+
+```bash
+# Get latest reading
+curl http://192.168.178.152:8000/api/v1/readings/latest/1
+
+# Get all readings
+curl http://192.168.178.152:8000/api/v1/readings/1
+```
+
+### Current System Status
+- ✅ ESP32 sending data every 10 seconds
+- ✅ Backend storing readings in PostgreSQL
+- ✅ Installation ID: 1, MAC: EC64C9C05E97
+- 🔄 **Next:** Chainlink Functions integration
+
+## 🏗️ System Architecture
+
+### Hardware Components
+- **Secure Measurement Hardware (ESP32)**
+  - Measures power data (voltage, current, temperature)
+  - Cryptographically signs measurements using ATECC608A
+  - Sends verified data to Raspberry Pi
+
+- **Raspberry Pi**
+  - Receives verified data from secure hardware
+  - Runs monitoring dashboard
+  - Communicates with blockchain
+
+### Software Components
+
+#### Directory Structure
 ```
 wattwitness/
 ├── ESPfirmware/           # ESP32 code
 │   └── ESP32_Sig          # ESP32 signature code
 ├── RaspberryPi/           # Dashboard and API
-│   ├── backend/           # FastAPI backend (runs on Raspberry Pi)
+│   ├── backend/           # FastAPI backend
 │   │   ├── app/
-│   │   │   ├── api/      # API endpoints
-│   │   │   ├── db/       # Database models
-│   │   │   └── core/     # Core functionality
-│   │   └── tests/        # Backend tests
-│   └── frontend/         # React dashboard (served by Raspberry Pi)
+│   │   │   ├── api/       # API endpoints
+│   │   │   ├── db/        # Database models
+│   │   │   └── core/      # Core functionality
+│   │   └── main.py        # Application entry
+│   └── frontend/          # Dashboard (React)
 │       ├── src/
-│       │   ├── components/  # React components
-│       │   └── App.tsx     # Main application
-│       └── public/         # Static assets
+│       │   ├── components/
+│       │   ├── pages/
+│       │   └── services/  # API integration
+│       └── public/
 ├── smart-contracts/   # Blockchain integration
+│   ├── contracts/     # Solidity contracts
+│   └── scripts/       # Deployment scripts
 ├── docs/             # Documentation
 ```
 
-## Getting Started
+## 🔐 Security Features
+
+- Hardware-level cryptographic signing with ATECC608A
+- API authentication and validation
+- Blockchain immutability for data integrity
+- Secure key storage and management
+- Data verification at multiple levels
+
+## 🚀 Getting Started
 
 ### Prerequisites
-
-- Python 3.8+
-- Node.js 18+
+- Python 3.10+
 - PostgreSQL
-- Docker (optional)
-- Raspberry Pi 4 (for production deployment)
+- ESP32 with ATECC608A
+- ShellyEM power meter
 
-### Installation
+### Backend Setup
+1. Clone the repository
+2. Install dependencies: `pip install -r requirements.txt`
+3. Configure database in `app/core/config.py`
+4. Run: `uvicorn main:app --reload --host 0.0.0.0 --port 8000`
 
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/yourusername/wattwitness.git
-   cd wattwitness
-   ```
+### ESP32 Setup
+1. Update WiFi credentials in `ESPfirmware/ESP32_Sig`
+2. Update backend IP address
+3. Flash to ESP32
+4. Monitor serial output for connection status
 
-2. Set up the development environment:
-   ```bash
-   # Backend setup
-   cd RaspberryPi/backend
-   python -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
-   pip install -r requirements.txt
+## 📊 Data Flow
 
-   # Frontend setup
-   cd RaspberryPi/frontend
-   npm install
-   ```
+1. **Measurement:** Secure hardware measures power data and cryptographically signs it
+2. **Verification:** Raspberry Pi receives signed data and verifies hardware signature
+3. **Storage:** Data is stored in PostgreSQL with verification status
+4. **Blockchain:** Verified data is submitted to blockchain via Chainlink Functions
+5. **Dashboard:** Real-time power readings and historical data visualization
 
-3. Configure the environment:
-   ```bash
-   # Backend
-   cd RaspberryPi/backend
-   cp .env.example .env
-   # Edit .env with your configuration
+## 🤝 Contributing
 
-   # Frontend
-   cd RaspberryPi/frontend
-   cp .env.example .env
-   # Edit .env with your configuration
-   ```
+This project is part of a hackathon. For integration work:
+- Use the API endpoints documented above
+- Test with the provided curl commands
+- Coordinate with the team for blockchain integration
 
-## Development
+## 📄 License
 
-### Backend (Raspberry Pi)
-```bash
-cd RaspberryPi/backend
-python -m uvicorn main:app --reload
-```
-
-### Frontend (Development)
-```bash
-cd RaspberryPi/frontend
-npm run dev
-```
-
-### Production Deployment (Raspberry Pi)
-```bash
-# Build frontend
-cd RaspberryPi/frontend
-npm run build
-
-# Start backend (with frontend served)
-cd RaspberryPi/backend
-python -m uvicorn main:app --host 0.0.0.0 --port 8000
-```
-
-### Smart Contracts
-```bash
-cd smart-contracts
-npx hardhat node
-```
-
-## Features
-
-### Backend (Raspberry Pi)
-- FastAPI-based REST API
-- PostgreSQL database integration
-- Real-time power data ingestion
-- Hardware signature verification
-- Blockchain transaction management
-- Serves the React dashboard
-
-### Frontend
-- Real-time power monitoring dashboard
-- System status visualization
-- Historical data charts
-- Blockchain verification status
-- Dark mode UI with Material-UI
-
-## Testing
-
-## Contributing
-
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
-
-## License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## Acknowledgments
-
-- Chainlink for oracle services
-- Avalanche for blockchain infrastructure
-- All hardware manufacturers for their components 
+[Add your license information here] 
