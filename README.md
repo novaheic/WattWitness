@@ -83,20 +83,21 @@ GET /api/v1/readings/verification
 ```
 wattwitness/
 ├── firmware/           # ESP32 code
-├── backend/           # FastAPI backend (runs on Raspberry Pi)
-│   ├── app/
-│   │   ├── api/      # API endpoints
-│   │   ├── db/       # Database models
-│   │   └── core/     # Core functionality
-│   └── tests/        # Backend tests
-├── frontend/         # React dashboard (served by Raspberry Pi)
-│   ├── src/
-│   │   ├── components/  # React components
-│   │   └── App.tsx     # Main application
-│   └── public/         # Static assets
+│   └── ESP32_Sig       # ESP32 signature code
+├── dashboard/          # Dashboard and API
+│   ├── backend/        # FastAPI backend (runs on Raspberry Pi)
+│   │   ├── app/
+│   │   │   ├── api/      # API endpoints
+│   │   │   ├── db/       # Database models
+│   │   │   └── core/     # Core functionality
+│   │   └── tests/        # Backend tests
+│   └── frontend/       # React dashboard (served by Raspberry Pi)
+│       ├── src/
+│       │   ├── components/  # React components
+│       │   └── App.tsx     # Main application
+│       └── public/         # Static assets
 ├── smart-contracts/   # Blockchain integration
 ├── docs/             # Documentation
-└── tests/            # Test suites
 ```
 
 ## Getting Started
@@ -120,25 +121,25 @@ wattwitness/
 2. Set up the development environment:
    ```bash
    # Backend setup
-   cd backend
+   cd dashboard/backend
    python -m venv venv
    source venv/bin/activate  # On Windows: venv\Scripts\activate
    pip install -r requirements.txt
 
    # Frontend setup
-   cd frontend
+   cd dashboard/frontend
    npm install
    ```
 
 3. Configure the environment:
    ```bash
    # Backend
-   cd backend
+   cd dashboard/backend
    cp .env.example .env
    # Edit .env with your configuration
 
    # Frontend
-   cd frontend
+   cd dashboard/frontend
    cp .env.example .env
    # Edit .env with your configuration
    ```
@@ -147,24 +148,24 @@ wattwitness/
 
 ### Backend (Raspberry Pi)
 ```bash
-cd backend
+cd dashboard/backend
 python -m uvicorn main:app --reload
 ```
 
 ### Frontend (Development)
 ```bash
-cd frontend
+cd dashboard/frontend
 npm run dev
 ```
 
 ### Production Deployment (Raspberry Pi)
 ```bash
 # Build frontend
-cd frontend
+cd dashboard/frontend
 npm run build
 
 # Start backend (with frontend served)
-cd backend
+cd dashboard/backend
 python -m uvicorn main:app --host 0.0.0.0 --port 8000
 ```
 
@@ -192,20 +193,6 @@ npx hardhat node
 - Dark mode UI with Material-UI
 
 ## Testing
-
-```bash
-# Backend tests
-cd backend
-pytest
-
-# Frontend tests
-cd frontend
-npm test
-
-# Smart contract tests
-cd smart-contracts
-npx hardhat test
-```
 
 ## Contributing
 

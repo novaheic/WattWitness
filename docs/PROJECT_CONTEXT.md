@@ -22,29 +22,24 @@ WattWitness is a Trustless Tamperproof Electricity Production Meter system for s
 ```
 wattwitness/
 ├── firmware/           # ESP32 code
-│   ├── src/           # Source code
-│   └── lib/           # Libraries
-│
-├── backend/           # FastAPI backend
-│   ├── app/
-│   │   ├── api/       # API endpoints
-│   │   ├── db/        # Database models
-│   │   └── core/      # Core functionality
-│   └── main.py        # Application entry
-│
-├── frontend/          # Dashboard (React)
-│   ├── src/
-│   │   ├── components/
-│   │   ├── pages/
-│   │   └── services/  # API integration
-│   └── public/
-│
+│   └── ESP32_Sig       # ESP32 signature code
+├── dashboard/          # Dashboard and API
+│   ├── backend/        # FastAPI backend
+│   │   ├── app/
+│   │   │   ├── api/       # API endpoints
+│   │   │   ├── db/        # Database models
+│   │   │   └── core/      # Core functionality
+│   │   └── main.py        # Application entry
+│   └── frontend/          # Dashboard (React)
+│       ├── src/
+│       │   ├── components/
+│       │   ├── pages/
+│       │   └── services/  # API integration
+│       └── public/
 ├── smart-contracts/   # Blockchain integration
 │   ├── contracts/     # Solidity contracts
 │   └── scripts/       # Deployment scripts
-│
 ├── docs/             # Documentation
-└── tests/            # Test suites
 ```
 
 ### 3. Data Flow
@@ -134,11 +129,7 @@ GET  /api/v1/status/           # System status
    - Upgradeability considerations
 
 ### 8. Testing Strategy
-- Unit tests for all components
-- Integration tests for API
-- End-to-end tests for critical flows
-- Hardware simulation tests
-- Blockchain integration tests
+Remove or update this section to reflect that the tests directory no longer exists.
 
 ### 9. Deployment Considerations
 - Docker containerization

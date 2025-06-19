@@ -1,0 +1,8 @@
+# External Arduino libraries required for ESP32_Sig
+ArduinoECCX08  # https://github.com/arduino-libraries/ArduinoECCX08
+
+# Built-in libraries (no need to install separately):
+# - Wire
+# - WiFi
+# - HTTPClient
+# - Arduino (core) 
