@@ -1,15 +1,17 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
+import { useInstallation, useTotalProduction, useLifetimeProduction, useChartData } from '../hooks/usePowerData';
 
-const data = [
-  { day: 'T', value: 250 },
-  { day: 'W', value: 200 },
-  { day: 'T', value: 280 },
-  { day: 'F', value: 300 },
-  { day: 'S', value: 143.5 },
-  { day: 'S', value: 120 },
-  { day: 'M', value: 180 },
-];
+// Remove static data - we'll use real data from API
+// const data = [
+//   { day: 'T', value: 250 },
+//   { day: 'W', value: 200 },
+//   { day: 'T', value: 280 },
+//   { day: 'F', value: 300 },
+//   { day: 'S', value: 143.5 },
+//   { day: 'S', value: 120 },
+//   { day: 'M', value: 180 },
+// ];
 
 type TimeFrame = {
   id: number;
@@ -25,18 +27,31 @@ const timeFrames: TimeFrame[] = [
 ];
 
 const CustomTooltip = ({ active, payload, coordinate, viewBox }: any) => {
-  if (active && payload && payload.length) {
+  if (active && payload && payload.length && viewBox) {
     const value = payload[0].value;
-    const maxValue = Math.max(...data.map(item => item.value));
+    
+    // Get the maximum value from the entire chart data for proper scaling
+    const chartData = payload[0].payload && payload[0].payload.chartData ? payload[0].payload.chartData : [];
+    const chartMax = chartData.length > 0 ? Math.max(...chartData.map((d: any) => d.value)) : value;
     
     // Calculate the exact Y position based on the chart's viewBox
     const { height } = viewBox;
-    const barTopPosition = height - (value / maxValue * height);
-    
+    const barTopPosition = height - (value / (chartMax || 1) * height);
+
+    // Format the value with appropriate units
+    let formattedValue: string;
+    if (value >= 1000000) {
+      formattedValue = `${(value / 1000000).toFixed(2)} MWh`;
+    } else if (value >= 1000) {
+      formattedValue = `${(value / 1000).toFixed(2)} kWh`;
+    } else {
+      formattedValue = `${value.toFixed(2)} Wh`;
+    }
+
     return (
       <div
         style={{
-          transform: 'translate(-50%, -100%)', // Move up by its full height
+          transform: 'translate(-50%, -100%)',
           left: coordinate.x,
           top: barTopPosition,
           position: 'absolute',
@@ -45,8 +60,7 @@ const CustomTooltip = ({ active, payload, coordinate, viewBox }: any) => {
       >
         <div className="relative">
           <div className="bg-[#1A1A1A]/90 text-white px-3 py-1.5 rounded-full text-sm whitespace-nowrap flex items-center gap-1">
-            <span className="font-medium">{value}</span>
-            <span>kWh</span>
+            <span className="font-medium">{formattedValue}</span>
           </div>
           {/* Triangle pointer */}
           <div 
@@ -56,7 +70,7 @@ const CustomTooltip = ({ active, payload, coordinate, viewBox }: any) => {
               height: 0,
               borderLeft: '6px solid transparent',
               borderRight: '6px solid transparent',
-              borderTop: '6px solid rgba(26, 26, 26, 0.9)' // Match the opacity of the tooltip
+              borderTop: '6px solid rgba(26, 26, 26, 0.9)'
             }}
           />
         </div>
@@ -74,6 +88,55 @@ export const EnergyChart: React.FC = () => {
   // Add ref for the chart container
   const chartRef = useRef<HTMLDivElement>(null);
   const [chartWidth, setChartWidth] = useState(0);
+
+  // Get installation and production data
+  const { data: installation, isLoading: installationLoading } = useInstallation();
+  const { data: totalProduction, isLoading: totalProductionLoading, error: totalProductionError } = useTotalProduction(
+    installation?.id, 
+    selectedTimeFrame.name
+  );
+  const { data: lifetimeProduction, isLoading: lifetimeLoading, error: lifetimeError } = useLifetimeProduction(
+    installation?.id
+  );
+  
+  // Get chart data
+  const { data: chartData, isLoading: chartLoading, error: chartError } = useChartData(
+    installation?.id,
+    selectedTimeFrame.name
+  );
+
+  // Transform chart data for Recharts
+  const chartDataForRecharts = (chartData?.data_points || []).map(point => {
+    // Convert UTC timestamp to local time string for the X-axis label
+    const date = new Date(point.timestamp * 1000);
+    let localLabel = '';
+    switch (selectedTimeFrame.name.toLowerCase()) {
+      case 'hour':
+        localLabel = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        break;
+      case 'day':
+        localLabel = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        break;
+      case 'week':
+        localLabel = date.toLocaleDateString([], { weekday: 'short' });
+        break;
+      case 'month':
+        localLabel = date.toLocaleDateString([], { month: 'short', day: '2-digit' });
+        break;
+      case 'year':
+        localLabel = date.toLocaleDateString([], { month: 'short' });
+        break;
+      default:
+        localLabel = point.label;
+    }
+    return {
+      day: localLabel,
+      value: point.value,
+      rawLabel: point.label,
+      timestamp: point.timestamp,
+      chartData: chartData?.data_points || [] // Include full chart data for tooltip scaling
+    };
+  });
 
   // Update chart width on mount and resize
   useEffect(() => {
@@ -106,6 +169,43 @@ export const EnergyChart: React.FC = () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, []);
+
+  // Format production values with appropriate units
+  const formatProduction = (value: number | undefined, isLoading: boolean, error: any) => {
+    if (isLoading) return 'Loading...';
+    if (error) return 'Error';
+    if (value === undefined || value === null) return '0.00 Wh';
+    
+    // Format with appropriate units based on value size
+    if (value >= 1000000) {
+      const result = `${(value / 1000000).toFixed(2)} MWh`;
+      return result;
+    } else if (value >= 1000) {
+      const result = `${(value / 1000).toFixed(2)} kWh`;
+      return result;
+    } else {
+      const result = `${value.toFixed(2)} Wh`;
+      return result;
+    }
+  };
+
+  const formatLifetimeProduction = (value: number | undefined, isLoading: boolean, error: any) => {
+    if (isLoading) return 'Loading...';
+    if (error) return 'Error';
+    if (value === undefined || value === null) return '0.00 Wh';
+    
+    // Format large numbers with appropriate units
+    if (value >= 1000000) {
+      const result = `${(value / 1000000).toFixed(2)} MWh`;
+      return result;
+    } else if (value >= 1000) {
+      const result = `${(value / 1000).toFixed(2)} kWh`;
+      return result;
+    } else {
+      const result = `${value.toFixed(2)} Wh`;
+      return result;
+    }
+  };
 
   return (
     <div className="h-full flex flex-col">
@@ -164,55 +264,73 @@ export const EnergyChart: React.FC = () => {
         {/* Stats Section - Left Side */}
         <div className="flex flex-col justify-end pr-8 mb-8">
           <div className="mb-4">
-            <h3 className="text-3xl font-bold text-gray-900">1522.34 <span className="text-lg">kWh</span></h3>
+            <h3 className="text-3xl font-bold text-gray-900">
+              {formatProduction(totalProduction, totalProductionLoading, totalProductionError)}
+            </h3>
             <p className="text-sm text-gray-500 mt-1">Produced this {selectedTimeFrame.name.toLowerCase()}</p>
           </div>
           <div>
-            <h3 className="text-3xl font-bold text-gray-900">766.52 <span className="text-lg">MW</span></h3>
+            <h3 className="text-3xl font-bold text-gray-900">
+              {formatLifetimeProduction(lifetimeProduction, lifetimeLoading, lifetimeError)}
+            </h3>
             <p className="text-sm text-gray-500 mt-1">Lifetime Production</p>
           </div>
         </div>
 
         {/* Chart Section - Right Side */}
         <div className="flex-1 pt-4" ref={chartRef}>
-          <ResponsiveContainer width="100%" height={280}>
-            <BarChart 
-              data={data} 
-              margin={{ top: 20, right: 10, left: 40, bottom: 20 }}
-              barSize={40}
-            >
-              <defs>
-                <linearGradient id="barGradient" x1="0" y1="0" x2="1" y2="0">
-                  <stop offset="0%" stopColor="#FF61B8" />
-                  <stop offset="100%" stopColor="#FFA630" />
-                </linearGradient>
-                <pattern id="gradient" patternUnits="userSpaceOnUse" width={chartWidth} height="100%">
-                  <rect width={chartWidth} height="100%" fill="url(#barGradient)" />
-                </pattern>
-              </defs>
-              <XAxis 
-                dataKey="day" 
-                axisLine={{ stroke: '#E5E7EB', strokeWidth: 1 }}
-                tickLine={false}
-                tick={{ fill: '#6B7280', fontSize: 12 }}
-              />
-              <YAxis 
-                hide={true}
-                domain={[0, 'dataMax']}
-              />
-              <Tooltip 
-                content={<CustomTooltip />}
-                cursor={false}
-                allowEscapeViewBox={{ x: false, y: true }}
-                position={{ x: 0, y: 0 }}
-              />
-              <Bar 
-                dataKey="value" 
-                fill="url(#gradient)"
-                radius={[4, 4, 0, 0]}
-              />
-            </BarChart>
-          </ResponsiveContainer>
+          {chartLoading ? (
+            <div className="flex items-center justify-center h-[280px]">
+              <div className="text-gray-500 text-sm">Loading chart data...</div>
+            </div>
+          ) : chartError ? (
+            <div className="flex items-center justify-center h-[280px]">
+              <div className="text-red-500 text-sm">Error loading chart data</div>
+            </div>
+          ) : chartDataForRecharts.length === 0 ? (
+            <div className="flex items-center justify-center h-[280px]">
+              <div className="text-gray-500 text-sm">No data available for this time frame</div>
+            </div>
+          ) : (
+            <ResponsiveContainer width="100%" height={280}>
+              <BarChart 
+                data={chartDataForRecharts} 
+                margin={{ top: 20, right: 10, left: 40, bottom: 20 }}
+                barSize={40}
+              >
+                <defs>
+                  <linearGradient id="barGradient" x1="0" y1="0" x2="1" y2="0">
+                    <stop offset="0%" stopColor="#FF61B8" />
+                    <stop offset="100%" stopColor="#FFA630" />
+                  </linearGradient>
+                  <pattern id="gradient" patternUnits="userSpaceOnUse" width={chartWidth} height="100%">
+                    <rect width={chartWidth} height="100%" fill="url(#barGradient)" />
+                  </pattern>
+                </defs>
+                <XAxis 
+                  dataKey="day" 
+                  axisLine={{ stroke: '#E5E7EB', strokeWidth: 1 }}
+                  tickLine={false}
+                  tick={{ fill: '#6B7280', fontSize: 12 }}
+                />
+                <YAxis 
+                  hide={true}
+                  domain={[0, 'dataMax']}
+                />
+                <Tooltip 
+                  content={<CustomTooltip />}
+                  cursor={false}
+                  allowEscapeViewBox={{ x: false, y: true }}
+                  position={{ x: 0, y: 0 }}
+                />
+                <Bar 
+                  dataKey="value" 
+                  fill="url(#gradient)"
+                  radius={[4, 4, 0, 0]}
+                />
+              </BarChart>
+            </ResponsiveContainer>
+          )}
         </div>
       </div>
     </div>

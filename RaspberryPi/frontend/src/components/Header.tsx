@@ -1,7 +1,11 @@
 import React from 'react';
 import logo from '../assets/logo.png';
+import { useInternetStatus } from '../hooks/usePowerData';
 
 export const Header: React.FC = () => {
+  // Get real internet connectivity status
+  const { data: internetConnected = false, isLoading: internetLoading } = useInternetStatus();
+
   return (
     <header className="w-full pt-8">
       <div className="max-w-[1920px] w-full mx-auto px-24 lg:px-48 xl:px-64 2xl:px-80">
@@ -30,8 +34,16 @@ export const Header: React.FC = () => {
               </svg>
             </button>
             <div className="flex items-center space-x-2 px-4 py-2 rounded-[10px] bg-white">
-              <div className="h-2.5 w-2.5 bg-green-500 rounded-full"></div>
-              <span className="text-sm font-medium text-gray-600">Online</span>
+              {internetLoading ? (
+                // Loading state
+                <div className="h-2.5 w-2.5 animate-pulse bg-gray-400 rounded-full"></div>
+              ) : (
+                // Status indicator
+                <div className={`h-2.5 w-2.5 rounded-full ${internetConnected ? 'bg-green-500' : 'bg-red-500'}`}></div>
+              )}
+              <span className={`text-sm font-medium ${internetLoading ? 'text-gray-400' : internetConnected ? 'text-gray-600' : 'text-red-500'}`}>
+                {internetLoading ? 'Checking...' : internetConnected ? 'Online' : 'Offline'}
+              </span>
             </div>
           </div>
         </div>

@@ -5,30 +5,55 @@ WattWitness is a Trustless Tamperproof Electricity Production Meter system for s
 
 ## 🚀 Current Status
 
-**✅ WORKING SYSTEM - ESP32 to Backend Integration Complete**
+**✅ FULLY FUNCTIONAL SYSTEM - Complete ESP32 to Dashboard Integration**
 
 The system is currently operational with:
-- ESP32 collecting and signing power data from ShellyEM
+- ESP32 collecting and signing power data from ShellyEM every 10 seconds
 - FastAPI backend storing verified readings in PostgreSQL
-- Real-time data flow every 10 seconds
-- Installation ID: 1, MAC: EC64C9C05E97
+- Real-time React dashboard with live monitoring
+- System status monitoring (internet connectivity, ESP32 liveliness)
+- Energy production charts with multiple time frames
+- Automatic data aggregation and visualization
+
+## 🎯 Key Features Implemented
+
+### ✅ **Real-Time Dashboard**
+- **Live Power Output:** Current power production with real-time updates every 10 seconds
+- **Energy Charts:** Interactive charts showing production over Hour, Day, Week, Month, Year
+- **System Status:** Live monitoring of internet connectivity and ESP32 status
+- **Latest Records:** Recent power readings with timestamps
+- **General Info:** Device information and uptime tracking
+
+### ✅ **Data Management**
+- **Automatic Aggregation:** Smart data grouping for different time frames
+- **Energy Calculations:** Accurate power-based energy production calculations
+- **Lifetime Tracking:** Production tracking since system initialization
+- **Local Time Support:** Proper timezone handling for global deployments
+
+### ✅ **System Monitoring**
+- **Internet Connectivity:** Real-time internet status with robust error handling
+- **ESP32 Liveliness:** Automatic detection of ESP32 connection status
+- **Overall System Health:** Combined status indicators for system health
 
 ## 📡 API Access
 
-**Backend URL:** `http://192.168.178.152:8000`  
-**API Documentation:** `http://192.168.178.152:8000/docs`
+**Backend URL:** `http://localhost:8000` (development) / `http://<pi-ip>:8000` (production)  
+**API Documentation:** `http://localhost:8000/docs`
 
 ### Available Endpoints
 
 #### Installations (Setup)
 - `POST /api/v1/installations/` - Creates/updates installation
-- Payload: `{"name": "Hackathon Test 1", "public_key": "...", "shelly_payload": "base64_encoded_json"}`
+- `GET /api/v1/installations/` - Get all installations
 
 #### Power Readings
 - `POST /api/v1/readings/` - Stores power readings
-- Payload: `{"power": 16.6, "total": 21700.0, "timestamp": 1750352712, "signature": "...", "shelly_payload": "base64_encoded_json"}`
 - `GET /api/v1/readings/{installation_id}` - Get readings for installation
 - `GET /api/v1/readings/latest/{installation_id}` - Get latest reading
+- `GET /api/v1/readings/{installation_id}/chart` - Get chart data for time frames
+
+#### System Status
+- `GET /health` - System health check
 
 ### Data Structure
 
@@ -58,6 +83,21 @@ The system is currently operational with:
 }
 ```
 
+#### Chart Data
+```json
+{
+  "data_points": [
+    {
+      "label": "14:00",
+      "value": 250.5,
+      "timestamp": 1750352400
+    }
+  ],
+  "time_frame": "hour",
+  "total_energy": 1250.25
+}
+```
+
 ## 🔗 Integration Guide for Teammates
 
 ### For Chainlink Integration
@@ -78,16 +118,21 @@ The system is currently operational with:
 
 ```bash
 # Get latest reading
-curl http://192.168.178.152:8000/api/v1/readings/latest/1
+curl http://localhost:8000/api/v1/readings/latest/1
+
+# Get chart data for week view
+curl http://localhost:8000/api/v1/readings/1/chart?time_frame=week
 
 # Get all readings
-curl http://192.168.178.152:8000/api/v1/readings/1
+curl http://localhost:8000/api/v1/readings/1
 ```
 
 ### Current System Status
 - ✅ ESP32 sending data every 10 seconds
 - ✅ Backend storing readings in PostgreSQL
-- ✅ Installation ID: 1, MAC: EC64C9C05E97
+- ✅ Real-time dashboard with live updates
+- ✅ System monitoring and status indicators
+- ✅ Energy charts with multiple time frames
 - 🔄 **Next:** Chainlink Functions integration
 
 ## System Architecture
@@ -95,8 +140,8 @@ curl http://192.168.178.152:8000/api/v1/readings/1
 ### 1. Hardware Components
 - **Secure Measurement Hardware (ESP32)**
   - Measures power data (voltage, current, temperature)
-  - Cryptographically signs measurements
-  - Sends verified data to Raspberry Pi
+  - Cryptographically signs measurements using ATECC608A
+  - Sends verified data to Raspberry Pi every 10 seconds
 
 #### ESP32 Data Output Example
 The ESP32 outputs data in the following format for each measurement:
@@ -115,8 +160,8 @@ This includes:
 
 - **Raspberry Pi**
   - Receives verified data from secure hardware
-  - Runs monitoring dashboard
-  - Communicates with blockchain
+  - Runs monitoring dashboard and API
+  - Communicates with blockchain (future)
 
 ### 2. Software Components
 
@@ -132,13 +177,13 @@ wattwitness/
 │   │   │   ├── db/        # Database models
 │   │   │   └── core/      # Core functionality
 │   │   └── main.py        # Application entry
-│   └── frontend/          # Dashboard (React)
+│   └── frontend/          # Dashboard (React + TypeScript)
 │       ├── src/
-│       │   ├── components/
-│       │   ├── pages/
-│       │   └── services/  # API integration
+│       │   ├── components/ # Dashboard components
+│       │   ├── hooks/      # React Query hooks
+│       │   └── services/   # API integration
 │       └── public/
-├── smart-contracts/   # Blockchain integration
+├── smart-contracts/   # Blockchain integration (future)
 │   ├── contracts/     # Solidity contracts
 │   └── scripts/       # Deployment scripts
 ├── docs/             # Documentation
@@ -155,15 +200,15 @@ wattwitness/
    - Backend verifies hardware signature
    - Data is stored in PostgreSQL
 
-3. **Blockchain Integration**
+3. **Dashboard Display**
+   - Real-time power readings
+   - Historical data visualization
+   - System status monitoring
+
+4. **Blockchain Integration** (future)
    - Verified data is submitted to blockchain
    - Smart contracts handle tokenization
    - Transaction hashes are stored
-
-4. **Dashboard Display**
-   - Real-time power readings
-   - Historical data visualization
-   - Blockchain verification status
 
 ### 4. Database Schema
 
@@ -209,16 +254,18 @@ tokens
 ### 5. API Endpoints
 ```
 POST /api/v1/installations/          # Create/update installation
+GET  /api/v1/installations/          # Get all installations
 POST /api/v1/readings/               # Submit power readings
 GET  /api/v1/readings/{id}           # Get specific reading
 GET  /api/v1/readings/latest/{id}    # Get latest reading
+GET  /api/v1/readings/{id}/chart     # Get chart data for time frames
 GET  /api/v1/status/                 # System status
 ```
 
 ### 6. Security Considerations
 - Hardware-level cryptographic signing
 - API authentication
-- Blockchain immutability
+- Blockchain immutability (future)
 - Secure key storage
 - Data verification at multiple levels
 
@@ -229,24 +276,78 @@ GET  /api/v1/status/                 # System status
    - Follow REST API best practices
    - Document all endpoints
 
-2. **Frontend (React)**
+2. **Frontend (React + TypeScript)**
    - Component-based architecture
    - State management with React Query
-   - Real-time updates with WebSocket
+   - Real-time updates with polling
    - Responsive design
 
-3. **Smart Contracts**
+3. **Smart Contracts** (future)
    - Gas optimization
    - Security best practices
    - Comprehensive testing
    - Upgradeability considerations
 
-### 8. Testing Strategy
-Remove or update this section to reflect that the tests directory no longer exists.
-
-### 9. Deployment Considerations
+### 8. Deployment Considerations
 - Docker containerization
 - Environment configuration
 - Database migrations
 - Backup strategies
-- Monitoring and logging 
+- Monitoring and logging
+
+### 9. Production Setup
+
+#### Raspberry Pi Setup
+1. **Install Raspberry Pi OS**
+   - Download Raspberry Pi OS Lite
+   - Flash to SD card
+   - Enable SSH before first boot
+   - Configure Wi-Fi (optional)
+
+2. **System Setup**
+   ```bash
+   sudo apt update && sudo apt upgrade -y
+   sudo apt install git python3 python3-pip python3-venv postgresql postgresql-contrib nodejs npm -y
+   ```
+
+3. **Database Setup**
+   ```bash
+   sudo -u postgres psql
+   CREATE DATABASE wattwitness;
+   CREATE USER wattuser WITH PASSWORD 'your_password';
+   GRANT ALL PRIVILEGES ON DATABASE wattwitness TO wattuser;
+   \q
+   ```
+
+4. **Backend Setup**
+   ```bash
+   git clone https://github.com/<username>/WattWitness.git
+   cd WattWitness/RaspberryPi/backend
+   python3 -m venv venv
+   source venv/bin/activate
+   pip install -r requirements.txt
+   # Configure database URL in config.py
+   uvicorn main:app --host 0.0.0.0 --port 8000
+   ```
+
+5. **Frontend Setup**
+   ```bash
+   cd ../frontend
+   npm install
+   npm run build
+   serve -s dist -l 3000
+   ```
+
+6. **ESP32 Setup**
+   - Update Wi-Fi credentials and backend IP in Arduino IDE
+   - Flash to ESP32
+   - Power independently with USB adapter
+
+#### Storage Requirements
+- **1 year of readings:** ~800 MB (including overhead and indexes)
+- **Readings per year:** ~3.15 million (every 10 seconds)
+- **Database:** PostgreSQL recommended for production
+
+#### Data Retention
+- **Current:** All data kept indefinitely
+- **Future:** Implement 2-year retention with baseline tracking for lifetime production accuracy 

@@ -1,31 +1,82 @@
 import React from 'react';
+import { useInstallation, useLatestReading, useWeeklyAverage } from '../hooks/usePowerData';
 
 interface PowerOutputProps {
-  currentPower: number;  // in kW
-  weeklyAverage: number; // in kW
   isOnline?: boolean;
 }
 
 export const PowerOutput: React.FC<PowerOutputProps> = ({ 
-  currentPower = 12.8, 
-  weeklyAverage = 11.4,
   isOnline = true 
 }) => {
+  // Get installation data
+  const { data: installation, isLoading: installationLoading, error: installationError } = useInstallation();
+  
+  // Get latest power reading
+  const { 
+    data: latestReading, 
+    isLoading: readingLoading, 
+    error: readingError 
+  } = useLatestReading(installation?.id);
+  
+  // Get weekly average
+  const { 
+    data: weeklyAverage, 
+    isLoading: averageLoading, 
+    error: averageError 
+  } = useWeeklyAverage(installation?.id);
+
+  // Loading state
+  if (installationLoading || readingLoading || averageLoading) {
+    return (
+      <div className="h-full flex flex-col">
+        <div className="flex items-center gap-2 mb-4">
+          <h2 className="text-2xl font-medium text-gray-900">Power Output</h2>
+          <div className="w-2 h-2 rounded-full bg-yellow-500 animate-pulse" />
+        </div>
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-gray-500">Loading power data...</div>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (installationError || readingError || averageError) {
+    return (
+      <div className="h-full flex flex-col">
+        <div className="flex items-center gap-2 mb-4">
+          <h2 className="text-2xl font-medium text-gray-900">Power Output</h2>
+          <div className="w-2 h-2 rounded-full bg-red-500" />
+        </div>
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-red-500 text-center">
+            <div className="font-medium">Connection Error</div>
+            <div className="text-sm">Unable to load power data</div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Convert watts to kilowatts for display
+  const currentPower = latestReading ? latestReading.power_w / 1000 : 0;
+  const weeklyAvg = weeklyAverage ? weeklyAverage / 1000 : 0;
+  
   // Number of scale lines
   const scaleLines = 20;
   
   // Calculate dynamic scale range based on actual values
-  const minValue = Math.min(currentPower, weeklyAverage);
-  const maxValue = Math.max(currentPower, weeklyAverage);
+  const minValue = Math.min(currentPower, weeklyAvg);
+  const maxValue = Math.max(currentPower, weeklyAvg);
   const range = maxValue - minValue;
-  const padding = Math.max(range * 0.4, 2); // 40% padding or minimum 2 kW
+  const padding = Math.max(range * 0.4, 0.5); // 40% padding or minimum 0.5 kW
   
   const minPower = Math.max(0, minValue - padding);
   const maxPower = maxValue + padding;
   
   // Calculate positions as percentages (0-100%)
   const currentPosition = Math.max(0, Math.min(100, ((currentPower - minPower) / (maxPower - minPower)) * 100));
-  const averagePosition = Math.max(0, Math.min(100, ((weeklyAverage - minPower) / (maxPower - minPower)) * 100));
+  const averagePosition = Math.max(0, Math.min(100, ((weeklyAvg - minPower) / (maxPower - minPower)) * 100));
   
   return (
     <div className="h-full flex flex-col">
@@ -63,7 +114,10 @@ export const PowerOutput: React.FC<PowerOutputProps> = ({
           <div className="bg-white border border-gray-200 rounded-lg px-3 py-2 relative" style={{ boxShadow: '0 0 13px 0 rgba(0, 0, 0, 0.08)' }}>
             <div className="text-gray-500 text-xs">Real-Time:</div>
             <div className="text-lg font-medium text-gray-900">
-              {currentPower} <span className="text-sm">kW</span>
+              {currentPower >= 0.1
+                ? `${currentPower.toFixed(2)} kW`
+                : `${(currentPower * 1000).toFixed(1)} W`
+              }
             </div>
             {/* Triangle pointing down */}
             <svg 
@@ -83,7 +137,10 @@ export const PowerOutput: React.FC<PowerOutputProps> = ({
           <div className="bg-white border border-gray-200 rounded-lg px-3 py-2 relative" style={{ boxShadow: '0 0 13px 0 rgba(0, 0, 0, 0.08)' }}>
             <div className="text-gray-500 text-xs">7 Day Avg.</div>
             <div className="text-lg font-medium text-gray-900">
-              {weeklyAverage} <span className="text-sm">kW</span>
+              {weeklyAvg >= 0.1
+                ? `${weeklyAvg.toFixed(2)} kW`
+                : `${(weeklyAvg * 1000).toFixed(1)} W`
+              }
             </div>
             {/* Triangle pointing up */}
             <svg 

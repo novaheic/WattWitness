@@ -51,11 +51,21 @@ void sendInitialSetup() {
   // Base64 encode the ShellyEM payload
   String encodedPayload = base64::encode(shellyPayload);
   
+  // Get current timestamp for boot time (use ShellyEM timestamp if available)
+  unsigned long bootTimestamp = 0;
+  int tsIndex = shellyPayload.indexOf("\"unixtime\":");
+  if (tsIndex != -1) {
+    bootTimestamp = shellyPayload.substring(tsIndex + 11).toInt();
+  } else {
+    bootTimestamp = time(nullptr); // Fallback to current time
+  }
+  
   // Prepare JSON payload for initial setup
   String jsonPayload = "{";
   jsonPayload += "\"name\":\"Hackathon Test 1\",";
   jsonPayload += "\"public_key\":\"" + publicKeyHex + "\",";
-  jsonPayload += "\"shelly_payload\":\"" + encodedPayload + "\"";
+  jsonPayload += "\"shelly_payload\":\"" + encodedPayload + "\",";
+  jsonPayload += "\"boot_timestamp\":" + String(bootTimestamp);
   jsonPayload += "}";
   
   int postCode = http.POST(jsonPayload);

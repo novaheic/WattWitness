@@ -1,0 +1,227 @@
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useEffect, useRef } from 'react';
+import { api, PowerReading } from '../services/api';
+
+// Hook to get the first available installation ID
+export const useInstallation = () => {
+  return useQuery({
+    queryKey: ['installations'],
+    queryFn: api.getInstallations,
+    select: (installations) => {
+      // Find the installation with a non-empty shelly_mac (the real one)
+      const realInstallation = installations.find(inst => inst.shelly_mac && inst.shelly_mac.trim() !== '');
+      return realInstallation || installations[0]; // Fallback to first if none found
+    },
+    staleTime: 5 * 60 * 1000, // 5 minutes - installations don't change often
+    refetchInterval: false, // Don't refetch installations automatically
+  });
+};
+
+// Hook to get latest power reading
+export const useLatestReading = (installationId: number | undefined) => {
+  return useQuery({
+    queryKey: ['latest-reading', installationId],
+    queryFn: () => api.getLatestReading(installationId!),
+    enabled: !!installationId, // Only run if installationId is available
+    staleTime: 0, // Always consider data stale to get fresh timestamps
+    refetchInterval: 5000, // Poll every 5 seconds as backup
+    refetchIntervalInBackground: false,
+  });
+};
+
+// Hook to get weekly average power
+export const useWeeklyAverage = (installationId: number | undefined) => {
+  return useQuery({
+    queryKey: ['weekly-average', installationId],
+    queryFn: () => api.getWeeklyAverage(installationId!),
+    enabled: !!installationId,
+    staleTime: 0, // Always consider data stale
+    refetchInterval: 30000, // Refresh every 30 seconds (less frequent)
+    refetchIntervalInBackground: false,
+  });
+};
+
+// Hook to get recent readings for LatestRecords component
+export const useRecentReadings = (installationId: number | undefined, limit: number = 10) => {
+  return useQuery({
+    queryKey: ['recent-readings', installationId, limit],
+    queryFn: async () => {
+      const readings = await api.getReadings(installationId!);
+      return readings.slice(0, limit); // Get only the most recent ones
+    },
+    enabled: !!installationId,
+    staleTime: 0, // Always consider data stale
+    refetchInterval: 5000, // Refresh every 5 seconds as backup
+    refetchIntervalInBackground: false,
+  });
+};
+
+// Hook to get system health status
+export const useSystemHealth = () => {
+  return useQuery({
+    queryKey: ['system-health'],
+    queryFn: api.healthCheck,
+    staleTime: 0, // Always consider data stale
+    refetchInterval: 30000, // Check health every 30 seconds
+    refetchIntervalInBackground: false,
+  });
+};
+
+// Hook to get device information for GeneralInfo component
+export const useDeviceInfo = (installationId: number | undefined) => {
+  return useQuery({
+    queryKey: ['device-info', installationId],
+    queryFn: () => api.getDeviceInfo(installationId!),
+    enabled: !!installationId,
+    staleTime: 0, // Always consider data stale
+    refetchInterval: 5000, // Refresh every 5 seconds as backup
+    refetchIntervalInBackground: false,
+  });
+};
+
+// Hook to get total production for a specific time frame
+export const useTotalProduction = (installationId: number | undefined, timeFrame: string) => {
+  return useQuery({
+    queryKey: ['total-production', installationId, timeFrame],
+    queryFn: () => api.getTotalProduction(installationId!, timeFrame),
+    enabled: !!installationId,
+    staleTime: 0, // Always consider data stale
+    refetchInterval: 10000, // Refresh every 10 seconds as backup
+    refetchIntervalInBackground: false,
+    refetchOnMount: true, // Force refresh when component mounts
+    refetchOnWindowFocus: true, // Force refresh when window gains focus
+  });
+};
+
+// Hook to get lifetime production
+export const useLifetimeProduction = (installationId: number | undefined) => {
+  return useQuery({
+    queryKey: ['lifetime-production', installationId, 'v3'],
+    queryFn: () => api.getLifetimeProduction(installationId!),
+    enabled: !!installationId,
+    staleTime: 0, // Always consider data stale
+    refetchInterval: 10000, // Refresh every 10 seconds as backup
+    refetchIntervalInBackground: false,
+    refetchOnMount: true, // Force refresh when component mounts
+    refetchOnWindowFocus: true, // Force refresh when window gains focus
+  });
+};
+
+// Hook to get chart data for EnergyChart component
+export const useChartData = (installationId: number | undefined, timeFrame: string) => {
+  return useQuery({
+    queryKey: ['chart-data', installationId, timeFrame],
+    queryFn: () => api.getChartData(installationId!, timeFrame),
+    enabled: !!installationId,
+    staleTime: 0, // Always consider data stale
+    refetchInterval: 10000, // Refresh every 10 seconds as backup
+    refetchIntervalInBackground: false,
+    refetchOnMount: true, // Force refresh when component mounts
+    refetchOnWindowFocus: true, // Force refresh when window gains focus
+  });
+};
+
+// Hook to check internet connectivity
+export const useInternetStatus = () => {
+  return useQuery({
+    queryKey: ['internet-status'],
+    queryFn: async () => {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 5000);
+        try {
+          // Use a GET request to a reliable, CORS-friendly resource
+          await fetch('https://www.google.com/favicon.ico', {
+            method: 'GET',
+            mode: 'no-cors',
+            cache: 'no-cache',
+            signal: controller.signal
+          });
+          clearTimeout(timeoutId);
+          // If fetch does not throw, assume online
+          return true;
+        } catch (error) {
+          clearTimeout(timeoutId);
+          return false;
+        }
+      } catch {
+        return false;
+      }
+    },
+    staleTime: 0,
+    refetchInterval: 30000,
+    refetchIntervalInBackground: false,
+  });
+};
+
+// Hook to check if ESP32 is live (has recent readings)
+export const useESP32Status = (installationId: number | undefined) => {
+  return useQuery({
+    queryKey: ['esp32-status', installationId],
+    queryFn: async () => {
+      if (!installationId) return false;
+      
+      try {
+        const latestReading = await api.getLatestReading(installationId);
+        const now = Math.floor(Date.now() / 1000);
+        const timeSinceLastReading = now - latestReading.timestamp;
+        
+        // Consider ESP32 live if last reading was within the last 2 minutes
+        // (ESP32 sends data every 10 seconds, so 2 minutes gives some buffer)
+        return timeSinceLastReading <= 120;
+      } catch (error) {
+        console.warn('ESP32 status check failed:', error);
+        return false;
+      }
+    },
+    enabled: !!installationId,
+    staleTime: 0, // Always check
+    refetchInterval: 10000, // Check every 10 seconds
+    refetchIntervalInBackground: false,
+  });
+};
+
+// Custom hook to monitor for new ESP32 data and trigger refreshes
+export const useESP32DataMonitor = (installationId: number | undefined) => {
+  const queryClient = useQueryClient();
+  const lastDataRef = useRef<PowerReading | null>(null);
+  
+  const { data: currentData } = useQuery({
+    queryKey: ['esp32-monitor', installationId],
+    queryFn: () => api.getLatestReading(installationId!),
+    enabled: !!installationId,
+    staleTime: 0,
+    refetchInterval: 1000, // Check every second for new data
+    refetchIntervalInBackground: false,
+  });
+
+  // Monitor for new data and trigger refreshes
+  useEffect(() => {
+    if (currentData && (!lastDataRef.current || 
+        currentData.timestamp !== lastDataRef.current.timestamp || 
+        currentData.id !== lastDataRef.current.id)) {
+      
+      console.log('New ESP32 data detected, triggering dashboard refresh:', {
+        previousTimestamp: lastDataRef.current?.timestamp,
+        newTimestamp: currentData.timestamp,
+        previousId: lastDataRef.current?.id,
+        newId: currentData.id
+      });
+      
+      // Invalidate all related queries to trigger fresh data fetch
+      queryClient.invalidateQueries({ queryKey: ['latest-reading', installationId] });
+      queryClient.invalidateQueries({ queryKey: ['total-production'] });
+      queryClient.invalidateQueries({ queryKey: ['lifetime-production'] });
+      queryClient.invalidateQueries({ queryKey: ['recent-readings'] });
+      queryClient.invalidateQueries({ queryKey: ['weekly-average'] });
+      queryClient.invalidateQueries({ queryKey: ['device-info'] });
+      queryClient.invalidateQueries({ queryKey: ['chart-data'] });
+      queryClient.invalidateQueries({ queryKey: ['esp32-status'] });
+      
+      // Update the reference
+      lastDataRef.current = currentData;
+    }
+  }, [currentData, installationId, queryClient]);
+
+  return currentData;
+}; 

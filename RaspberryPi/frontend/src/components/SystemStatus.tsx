@@ -1,16 +1,17 @@
 import React from 'react';
+import { useInternetStatus, useESP32Status, useInstallation } from '../hooks/usePowerData';
 
-interface SystemStatusProps {
-  internetConnected: boolean;
-  blockchainUpToDate: boolean;
-  energyMeterLive: boolean;
-}
-
-export const SystemStatus: React.FC<SystemStatusProps> = ({
-  internetConnected = true,
-  blockchainUpToDate = true,
-  energyMeterLive = true,
-}) => {
+export const SystemStatus: React.FC = () => {
+  // Get installation for ESP32 status check
+  const { data: installation } = useInstallation();
+  
+  // Get real status values
+  const { data: internetConnected = false, isLoading: internetLoading } = useInternetStatus();
+  const { data: energyMeterLive = false, isLoading: esp32Loading } = useESP32Status(installation?.id);
+  
+  // Blockchain status - placeholder for now
+  const blockchainUpToDate = true; // TODO: Implement blockchain status check
+  
   // Calculate overall status
   const operationalCount = [internetConnected, blockchainUpToDate, energyMeterLive]
     .filter(Boolean).length;
@@ -32,17 +33,26 @@ export const SystemStatus: React.FC<SystemStatusProps> = ({
 
   interface CheckIconProps {
     isActive: boolean;
+    isLoading?: boolean;
   }
 
-  const CheckIcon: React.FC<CheckIconProps> = ({ isActive }) => (
-    <svg className={`w-5 h-5 ${isActive ? 'text-green-500' : 'text-red-500'}`} viewBox="0 0 20 20" fill="currentColor">
-      {isActive ? (
-        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-      ) : (
-        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-      )}
-    </svg>
-  );
+  const CheckIcon: React.FC<CheckIconProps> = ({ isActive, isLoading = false }) => {
+    if (isLoading) {
+      return (
+        <div className="w-5 h-5 animate-spin rounded-full border-2 border-gray-300 border-t-blue-500"></div>
+      );
+    }
+    
+    return (
+      <svg className={`w-5 h-5 ${isActive ? 'text-green-500' : 'text-red-500'}`} viewBox="0 0 20 20" fill="currentColor">
+        {isActive ? (
+          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+        ) : (
+          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+        )}
+      </svg>
+    );
+  };
 
   const PowerIcon = () => (
     <svg className={`w-11 h-11 ${statusColor}`} viewBox="0 0 28 28" fill="none" stroke="currentColor" strokeWidth="3">
@@ -65,16 +75,22 @@ export const SystemStatus: React.FC<SystemStatusProps> = ({
           {/* Status Items */}
           <div className="space-y-6">
             <div className="flex items-center gap-3">
-              <CheckIcon isActive={internetConnected} />
-              <span className={`text-gray-600 text-sm ${!internetConnected && 'text-red-500'}`}>Internet Connected</span>
+              <CheckIcon isActive={internetConnected} isLoading={internetLoading} />
+              <span className={`text-gray-600 text-sm ${!internetConnected && !internetLoading && 'text-red-500'}`}>
+                Internet Connected
+              </span>
             </div>
             <div className="flex items-center gap-3">
               <CheckIcon isActive={blockchainUpToDate} />
-              <span className={`text-gray-600 text-sm ${!blockchainUpToDate && 'text-red-500'}`}>Blockchain Up To Date</span>
+              <span className={`text-gray-600 text-sm ${!blockchainUpToDate && 'text-red-500'}`}>
+                Blockchain Up To Date
+              </span>
             </div>
             <div className="flex items-center gap-3">
-              <CheckIcon isActive={energyMeterLive} />
-              <span className={`text-gray-600 text-sm ${!energyMeterLive && 'text-red-500'}`}>Energy Meter Live</span>
+              <CheckIcon isActive={energyMeterLive} isLoading={esp32Loading} />
+              <span className={`text-gray-600 text-sm ${!energyMeterLive && !esp32Loading && 'text-red-500'}`}>
+                Energy Meter Live
+              </span>
             </div>
           </div>
         </div>
