@@ -12,6 +12,7 @@ class SolarInstallation(Base):
     name = Column(String, index=True)  # e.g., "Hackathon Test 1"
     shelly_mac = Column(String, unique=True)  # MAC address from ShellyEM
     public_key = Column(String, unique=True)  # Public key from ESP32
+    last_boot_timestamp = Column(BigInteger)  # Unix timestamp of last ESP32 boot/reset
     created_at = Column(DateTime, default=datetime.utcnow)
     is_active = Column(Boolean, default=True)
     
