@@ -7,7 +7,7 @@
 
 // WiFi credentials
 const char* ssid = "Ondemand";            // <-- CHANGE THIS
-const char* password = "CasaBerlin";      // <-- CHANGE THIS
+const char* password = "";      // <-- CHANGE THIS
 const char* shellyHost = "192.168.178.156"; // <-- CHANGE THIS
 const char* backendHost = "192.168.178.152"; // <-- CHANGE THIS
 
