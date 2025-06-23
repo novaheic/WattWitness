@@ -1,0 +1,62 @@
+{
+  "name": "wattwitness-smart-contracts",
+  "version": "1.0.0",
+  "description": "WattWitness IoT Energy Monitoring Smart Contracts with Chainlink Integration",
+  "main": "index.js",
+  "scripts": {
+    "compile": "hardhat compile",
+    "test": "hardhat test",
+    "deploy:local": "hardhat run scripts/deploy.js --network hardhat",
+    "deploy:fuji": "hardhat run scripts/deploy.js --network fuji",
+    "deploy:avalanche": "hardhat run scripts/deploy.js --network avalanche",
+    "deploy-consumer:fuji": "hardhat run scripts/deploy-consumer.js --network fuji",
+    "verify:fuji": "hardhat verify --network fuji",
+    "node": "hardhat node",
+    "clean": "hardhat clean",
+    "coverage": "hardhat coverage",
+    "gas-report": "REPORT_GAS=true hardhat test"
+  },
+  "keywords": [
+    "blockchain",
+    "iot",
+    "energy",
+    "monitoring",
+    "chainlink",
+    "avalanche",
+    "smart-contracts"
+  ],
+  "author": "WattWitness Team",
+  "license": "MIT",
+  "devDependencies": {
+    "@nomiclabs/hardhat-ethers": "^2.2.3",
+    "@nomiclabs/hardhat-etherscan": "^3.1.7",
+    "@typechain/ethers-v6": "^0.4.3",
+    "@typechain/hardhat": "^8.0.3",
+    "@types/chai": "^4.3.20",
+    "@types/mocha": "^10.0.10",
+    "chai": "^4.3.7",
+    "ethers": "^5.7.2",
+    "hardhat": "^2.17.1",
+    "hardhat-gas-reporter": "^1.0.9",
+    "solidity-coverage": "^0.8.4",
+    "ts-node": "^10.9.2",
+    "typechain": "^8.3.2",
+    "typescript": "^5.8.3"
+  },
+  "dependencies": {
+    "@chainlink/contracts": "^0.6.1",
+    "@openzeppelin/contracts": "^5.3.0",
+    "dotenv": "^16.3.1"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/your-username/wattwitness-smart-contracts.git"
+  },
+  "bugs": {
+    "url": "https://github.com/your-username/wattwitness-smart-contracts/issues"
+  },
+  "homepage": "https://github.com/your-username/wattwitness-smart-contracts#readme"
+}
