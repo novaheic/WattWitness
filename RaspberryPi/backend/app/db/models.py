@@ -35,7 +35,7 @@ class PowerReading(Base):
     verification_timestamp = Column(DateTime)
     
     # Blockchain fields
-    blockchain_tx_hash = Column(String, unique=True)  # Transaction hash on blockchain
+    blockchain_tx_hash = Column(String)  # Transaction hash on blockchain (not unique - multiple readings can share same TX)
     blockchain_block_number = Column(Integer)  # Block number where data is stored
     is_on_chain = Column(Boolean, default=False)
     

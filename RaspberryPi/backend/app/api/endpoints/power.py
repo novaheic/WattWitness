@@ -452,4 +452,151 @@ def get_chart_data(
         data_points=data_points,
         time_frame=time_frame,
         total_energy=total_energy
-    ) 
+    )
+
+# Blockchain integration endpoint
+class BlockchainUpdateRequest(BaseModel):
+    tx_hash: str
+    timestamp: int
+    installation_id: int = 1
+    block_number: int = None
+
+class BatchUpdateRequest(BaseModel):
+    reading_ids: List[int]
+    block_number: int = None
+
+@router.post("/blockchain/update")
+def receive_blockchain_data(blockchain_data: BlockchainUpdateRequest, db: Session = Depends(get_db)):
+    """Receive blockchain transaction data from remote blockchain client"""
+    try:
+        print(f"📡 Received blockchain update: TX {blockchain_data.tx_hash} for timestamp {blockchain_data.timestamp}")
+        
+        # Find matching reading by timestamp and installation
+        reading = db.query(PowerReading).filter(
+            PowerReading.timestamp == blockchain_data.timestamp,
+            PowerReading.installation_id == blockchain_data.installation_id,
+            PowerReading.is_on_chain == False
+        ).first()
+        
+        if reading:
+            # Update the reading with blockchain data
+            reading.is_on_chain = True
+            reading.blockchain_tx_hash = blockchain_data.tx_hash
+            if blockchain_data.block_number:
+                reading.blockchain_block_number = blockchain_data.block_number
+            
+            db.commit()
+            db.refresh(reading)
+            
+            print(f"✅ Updated reading {reading.id} with blockchain TX: {blockchain_data.tx_hash}")
+            return {
+                "success": True, 
+                "tx_hash": blockchain_data.tx_hash,
+                "reading_id": reading.id,
+                "message": "Reading successfully updated with blockchain data"
+            }
+        else:
+            print(f"⚠️ No matching reading found for timestamp {blockchain_data.timestamp}")
+            return {
+                "success": False, 
+                "error": "Reading not found",
+                "timestamp": blockchain_data.timestamp,
+                "installation_id": blockchain_data.installation_id
+            }
+            
+    except Exception as e:
+        print(f"❌ Error updating blockchain data: {str(e)}")
+        db.rollback()
+        return {
+            "success": False, 
+            "error": str(e)
+        }
+
+@router.get("/readings/unprocessed-batch/{installation_id}")
+def get_unprocessed_readings_batch(
+    installation_id: int,
+    minutes: int = 5,  # Default 5 minutes
+    db: Session = Depends(get_db)
+):
+    """Get all unprocessed readings from the last N minutes for batch processing"""
+    from datetime import datetime, timedelta
+    
+    try:
+        # Calculate time range
+        end_time = datetime.utcnow()
+        start_time = end_time - timedelta(minutes=minutes)
+        
+        # Convert to Unix timestamps
+        start_timestamp = int(start_time.timestamp())
+        end_timestamp = int(end_time.timestamp())
+        
+        print(f"📦 Fetching unprocessed readings for installation {installation_id}")
+        print(f"   Time range: {start_time} to {end_time}")
+        print(f"   Timestamps: {start_timestamp} to {end_timestamp}")
+        
+        readings = db.query(PowerReading).filter(
+            PowerReading.installation_id == installation_id,
+            PowerReading.is_on_chain == False,
+            PowerReading.timestamp >= start_timestamp,
+            PowerReading.timestamp <= end_timestamp
+        ).order_by(PowerReading.timestamp.asc()).all()
+        
+        print(f"✅ Found {len(readings)} unprocessed readings for batch processing")
+        
+        return [
+            {
+                "id": reading.id,
+                "power_w": reading.power_w,
+                "total_wh": reading.total_wh,
+                "timestamp": reading.timestamp,
+                "signature": reading.signature,
+                "installation_id": reading.installation_id
+            }
+            for reading in readings
+        ]
+        
+    except Exception as e:
+        print(f"❌ Error fetching batch readings: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+
+@router.put("/readings/batch-update/{tx_hash}")
+def update_readings_batch(
+    tx_hash: str,
+    batch_update: BatchUpdateRequest,
+    db: Session = Depends(get_db)
+):
+    """Update multiple readings with blockchain transaction data"""
+    try:
+        print(f"📦 Updating batch of {len(batch_update.reading_ids)} readings with TX: {tx_hash}")
+        
+        # Update readings one by one to avoid SQLAlchemy issues
+        updated_count = 0
+        for reading_id in batch_update.reading_ids:
+            reading = db.query(PowerReading).filter(PowerReading.id == reading_id).first()
+            if reading:
+                reading.is_on_chain = True
+                reading.blockchain_tx_hash = tx_hash
+                if batch_update.block_number:
+                    reading.blockchain_block_number = batch_update.block_number
+                updated_count += 1
+        
+        db.commit()
+        
+        print(f"✅ Successfully updated {updated_count} readings with blockchain TX: {tx_hash}")
+        
+        return {
+            "success": True,
+            "updated_count": updated_count,
+            "transaction_hash": tx_hash,
+            "block_number": batch_update.block_number,
+            "message": f"Successfully updated {updated_count} readings with blockchain data"
+        }
+        
+    except Exception as e:
+        print(f"❌ Error updating batch readings: {str(e)}")
+        db.rollback()
+        return {
+            "success": False,
+            "error": str(e),
+            "updated_count": 0
+        } 
