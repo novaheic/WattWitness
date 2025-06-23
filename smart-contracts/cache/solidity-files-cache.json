@@ -6,13 +6,12 @@
       "contentHash": "0cb8246e49926d7390636d3403dd979f",
       "sourceName": "contracts/chainlink/functions/FunctionsClient.sol",
       "solcConfig": {
-        "version": "0.8.20",
+        "version": "0.8.19",
         "settings": {
           "optimizer": {
             "enabled": true,
             "runs": 200
           },
-          "evmVersion": "paris",
           "outputSelection": {
             "*": {
               "*": [
@@ -156,13 +155,12 @@
       "contentHash": "8c1fa9c909f5dd7571e4feb4f850d4ea",
       "sourceName": "contracts/WattWitnessConsumer.sol",
       "solcConfig": {
-        "version": "0.8.20",
+        "version": "0.8.19",
         "settings": {
           "optimizer": {
             "enabled": true,
             "runs": 200
           },
-          "evmVersion": "paris",
           "outputSelection": {
             "*": {
               "*": [
@@ -195,13 +193,12 @@
       "contentHash": "1efee8aec85033d0dca0f4695c540154",
       "sourceName": "contracts/interfaces/IWattWitness.sol",
       "solcConfig": {
-        "version": "0.8.20",
+        "version": "0.8.19",
         "settings": {
           "optimizer": {
             "enabled": true,
             "runs": 200
           },
-          "evmVersion": "paris",
           "outputSelection": {
             "*": {
               "*": [
@@ -231,13 +228,12 @@
       "contentHash": "b839fb330a532ed712b4fcce18fa296c",
       "sourceName": "contracts/WattWitness.sol",
       "solcConfig": {
-        "version": "0.8.20",
+        "version": "0.8.19",
         "settings": {
           "optimizer": {
             "enabled": true,
             "runs": 200
           },
-          "evmVersion": "paris",
           "outputSelection": {
             "*": {
               "*": [
@@ -267,13 +263,12 @@
       "contentHash": "24b8c5a9cc006565337db3e04197a166",
       "sourceName": "contracts/chainlink/functions/interfaces/IFunctionsRouter.sol",
       "solcConfig": {
-        "version": "0.8.20",
+        "version": "0.8.19",
         "settings": {
           "optimizer": {
             "enabled": true,
             "runs": 200
           },
-          "evmVersion": "paris",
           "outputSelection": {
             "*": {
               "*": [
@@ -305,13 +300,12 @@
       "contentHash": "499b9928b7b9dc0c1b299f6c397153bd",
       "sourceName": "contracts/chainlink/functions/interfaces/IFunctionsClient.sol",
       "solcConfig": {
-        "version": "0.8.20",
+        "version": "0.8.19",
         "settings": {
           "optimizer": {
             "enabled": true,
             "runs": 200
           },
-          "evmVersion": "paris",
           "outputSelection": {
             "*": {
               "*": [
@@ -341,13 +335,12 @@
       "contentHash": "56330b71c5146f2fe109294dd6a895a2",
       "sourceName": "contracts/chainlink/functions/libraries/FunctionsRequest.sol",
       "solcConfig": {
-        "version": "0.8.20",
+        "version": "0.8.19",
         "settings": {
           "optimizer": {
             "enabled": true,
             "runs": 200
           },
-          "evmVersion": "paris",
           "outputSelection": {
             "*": {
               "*": [
@@ -379,13 +372,12 @@
       "contentHash": "f4e53f7f6aa5b5d826b13338830f2ef1",
       "sourceName": "contracts/chainlink/functions/libraries/FunctionsResponse.sol",
       "solcConfig": {
-        "version": "0.8.20",
+        "version": "0.8.19",
         "settings": {
           "optimizer": {
             "enabled": true,
             "runs": 200
           },
-          "evmVersion": "paris",
           "outputSelection": {
             "*": {
               "*": [
@@ -415,13 +407,12 @@
       "contentHash": "07b571d9ee8b9b58991793d887f8fb78",
       "sourceName": "contracts/vendor/solidity-cborutils/v2.0.0/CBOR.sol",
       "solcConfig": {
-        "version": "0.8.20",
+        "version": "0.8.19",
         "settings": {
           "optimizer": {
             "enabled": true,
             "runs": 200
           },
-          "evmVersion": "paris",
           "outputSelection": {
             "*": {
               "*": [
@@ -453,13 +444,12 @@
       "contentHash": "117e67df01522a41c415acb4355cd3c0",
       "sourceName": "contracts/vendor/solidity-cborutils/v2.0.0/Buffer.sol",
       "solcConfig": {
-        "version": "0.8.20",
+        "version": "0.8.19",
         "settings": {
           "optimizer": {
             "enabled": true,
             "runs": 200
           },
-          "evmVersion": "paris",
           "outputSelection": {
             "*": {
               "*": [
@@ -489,13 +479,12 @@
       "contentHash": "80867aa535bc160df3a10053c4e14819",
       "sourceName": "contracts/chainlink/functions/libraries/Buffer.sol",
       "solcConfig": {
-        "version": "0.8.20",
+        "version": "0.8.19",
         "settings": {
           "optimizer": {
             "enabled": true,
             "runs": 200
           },
-          "evmVersion": "paris",
           "outputSelection": {
             "*": {
               "*": [
@@ -525,13 +514,12 @@
       "contentHash": "411486b0b91db91019d5f6a8ccef196a",
       "sourceName": "contracts/chainlink/functions/libraries/CBOR.sol",
       "solcConfig": {
-        "version": "0.8.20",
+        "version": "0.8.19",
         "settings": {
           "optimizer": {
             "enabled": true,
             "runs": 200
           },
-          "evmVersion": "paris",
           "outputSelection": {
             "*": {
               "*": [
