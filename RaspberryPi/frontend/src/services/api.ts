@@ -81,6 +81,53 @@ export const api = {
     return response.data;
   },
 
+  // Get optimized power readings using backend aggregation and smart sampling
+  async getSampledReadings(
+    installationId: number,
+    startTime?: string,
+    endTime?: string,
+    maxReadings: number = 100, // Maximum number of readings to return
+    verifiedOnly: boolean = true
+  ): Promise<PowerReading[]> {
+    console.log(`Fetching optimized readings with max limit: ${maxReadings}`);
+    
+    try {
+      // Try the new optimized endpoint first
+      const params = new URLSearchParams();
+      if (startTime) params.append('start_time', startTime);
+      if (endTime) params.append('end_time', endTime);
+      params.append('max_points', maxReadings.toString());
+      params.append('verified_only', verifiedOnly.toString());
+      
+      const response = await apiClient.get(`/api/v1/readings/${installationId}/optimized?${params}`);
+      console.log(`Received ${response.data.length} optimized readings from backend`);
+      return response.data;
+      
+    } catch (error) {
+      console.warn('Optimized endpoint not available, falling back to client-side sampling');
+      
+      // Fallback to old method
+      const allReadings = await this.getReadings(installationId, startTime, endTime, verifiedOnly);
+      
+      if (allReadings.length <= maxReadings) {
+        console.log(`Got ${allReadings.length} readings (within limit)`);
+        return allReadings;
+      }
+      
+      // Sample readings by taking every Nth reading
+      const sampleInterval = Math.floor(allReadings.length / maxReadings);
+      const sampledReadings: PowerReading[] = [];
+      
+      for (let i = 0; i < allReadings.length; i += sampleInterval) {
+        sampledReadings.push(allReadings[i]);
+        if (sampledReadings.length >= maxReadings) break;
+      }
+      
+      console.log(`Sampled ${sampledReadings.length} readings from ${allReadings.length} total (every ${sampleInterval}th reading)`);
+      return sampledReadings;
+    }
+  },
+
   // Get ALL power readings for an installation (for lifetime calculations)
   async getAllReadings(
     installationId: number,
@@ -93,21 +140,24 @@ export const api = {
     return response.data;
   },
 
-  // Get 7-day average power (calculated from readings)
+  // Get 7-day average power (calculated from sampled readings)
   async getWeeklyAverage(installationId: number): Promise<number> {
     const endTime = new Date();
     const startTime = new Date(endTime.getTime() - 7 * 24 * 60 * 60 * 1000); // 7 days ago
     
     console.log(`Fetching weekly average for installation ${installationId} from ${startTime.toISOString()} to ${endTime.toISOString()}`);
     
-    const readings = await this.getReadings(
+    // Smart sampling: For weekly average, we only need ~200 readings max
+    // This reduces 60k+ readings to ~200 readings for much faster calculation
+    const readings = await this.getSampledReadings(
       installationId,
       startTime.toISOString(),
       endTime.toISOString(),
+      200, // Limit to 200 readings max
       true
     );
     
-    console.log(`Found ${readings.length} readings for weekly average calculation`);
+    console.log(`Found ${readings.length} sampled readings for weekly average calculation`);
     
     if (readings.length === 0) {
       console.log('No readings found for weekly average, returning 0');
@@ -117,7 +167,7 @@ export const api = {
     const totalPower = readings.reduce((sum, reading) => sum + reading.power_w, 0);
     const average = totalPower / readings.length;
     
-    console.log(`Weekly average calculated: ${average}W from ${readings.length} readings`);
+    console.log(`Weekly average calculated: ${average}W from ${readings.length} sampled readings`);
     return average;
   },
 
@@ -196,175 +246,50 @@ export const api = {
 
   // Get total energy production for a specific time frame
   async getTotalProduction(installationId: number, timeFrame: string): Promise<number> {
-    const now = Math.floor(Date.now() / 1000); // Current Unix timestamp
-    let startTime: number;
-
-    // Calculate start time based on time frame using Unix timestamps
+    console.log(`Getting total production for ${timeFrame} (fixed period, not chart-dependent)`);
+    
+    // The "Produced this [timeframe]" should represent a FIXED time period regardless of chart view
+    // For example: "Produced this month" should always show this month's data, 
+    // whether you're viewing month chart or year chart
+    
     switch (timeFrame.toLowerCase()) {
       case 'hour':
-        startTime = now - 60 * 60; // 1 hour ago
-        break;
       case 'day':
-        startTime = now - 24 * 60 * 60; // 1 day ago
-        break;
       case 'week':
-        startTime = now - 7 * 24 * 60 * 60; // 7 days ago
-        break;
+        // For these timeframes, use the chart data directly since it represents the period
+        const chartData = await this.getChartData(installationId, timeFrame);
+        console.log(`${timeFrame} production: ${chartData.total_energy} Wh (from chart total)`);
+        return chartData.total_energy;
+        
       case 'month':
-        startTime = now - 30 * 24 * 60 * 60; // 30 days ago
-        break;
+        // For month, always use the month chart to get this month's data
+        const monthChartData = await this.getChartData(installationId, 'month');
+        console.log(`Month production: ${monthChartData.total_energy} Wh (from month chart)`);
+        return monthChartData.total_energy;
+        
       case 'year':
-        startTime = now - 365 * 24 * 60 * 60; // 365 days ago
-        break;
+        // For year, we want "this year" which is the same as lifetime since system started in 2025
+        const yearChartData = await this.getChartData(installationId, 'year');
+        console.log(`Year production: ${yearChartData.total_energy} Wh (from year chart)`);
+        return yearChartData.total_energy;
+        
       default:
-        startTime = now - 24 * 60 * 60; // Default to 1 day
+        console.warn(`Unknown timeframe: ${timeFrame}, falling back to month`);
+        const fallbackData = await this.getChartData(installationId, 'month');
+        return fallbackData.total_energy;
     }
-
-    console.log(`Total production calculation for ${timeFrame}:`, {
-      startTime,
-      endTime: now,
-      startTimeISO: new Date(startTime * 1000).toISOString(),
-      endTimeISO: new Date(now * 1000).toISOString()
-    });
-
-    const readings = await this.getReadings(
-      installationId,
-      new Date(startTime * 1000).toISOString(),
-      new Date(now * 1000).toISOString(),
-      true
-    );
-
-    console.log(`Found ${readings.length} readings for ${timeFrame} production calculation`);
-
-    // Calculate total energy production using power readings instead of cumulative totals
-    if (readings.length < 2) {
-      console.log(`Not enough readings for ${timeFrame} production calculation`);
-      return 0;
-    }
-
-    // Calculate energy production by averaging power over time periods
-    let totalEnergyWh = 0;
-    
-    for (let i = 1; i < readings.length; i++) {
-      const currentReading = readings[i];
-      const previousReading = readings[i - 1];
-      
-      // Calculate time difference in hours
-      const timeDiffHours = (currentReading.timestamp - previousReading.timestamp) / 3600;
-      
-      // Use average power between readings
-      const averagePowerW = (currentReading.power_w + previousReading.power_w) / 2;
-      
-      // Calculate energy for this time period: Power × Time
-      const energyWh = averagePowerW * timeDiffHours;
-      
-      totalEnergyWh += Math.abs(energyWh); // Use absolute value to keep it positive
-    }
-
-    console.log(`${timeFrame} production calculation details:`, {
-      firstReading: {
-        id: readings[readings.length - 1].id,
-        timestamp: readings[readings.length - 1].timestamp,
-        total_wh: readings[readings.length - 1].total_wh,
-        power_w: readings[readings.length - 1].power_w,
-        created_at: readings[readings.length - 1].created_at
-      },
-      lastReading: {
-        id: readings[0].id,
-        timestamp: readings[0].timestamp,
-        total_wh: readings[0].total_wh,
-        power_w: readings[0].power_w,
-        created_at: readings[0].created_at
-      },
-      // Old calculation (cumulative difference)
-      cumulativeDifferenceWh: readings[0].total_wh - readings[readings.length - 1].total_wh,
-      cumulativeDifferenceKWh: (readings[0].total_wh - readings[readings.length - 1].total_wh) / 1000,
-      // New calculation (power-based)
-      totalEnergyWh: totalEnergyWh,
-      totalEnergyKWh: totalEnergyWh / 1000,
-      timeSpanHours: (readings[0].timestamp - readings[readings.length - 1].timestamp) / 3600,
-      averagePowerW: totalEnergyWh / ((readings[0].timestamp - readings[readings.length - 1].timestamp) / 3600)
-    });
-
-    // Return the power-based calculation instead of cumulative difference
-    return totalEnergyWh;
   },
 
-  // Get lifetime total energy production
+  // Get lifetime total energy production using chart API for consistency
   async getLifetimeProduction(installationId: number): Promise<number> {
-    const readings = await this.getAllReadings(installationId, true);
-    const installations = await this.getInstallations();
-    const installation = installations.find(inst => inst.id === installationId);
+    console.log(`Getting lifetime production using chart API (consistent calculation)`);
     
-    console.log(`Lifetime production calculation for installation ${installationId}:`);
-    console.log(`Found ${readings.length} total readings`);
+    // Since the system has only been running since June 2025, the "year" timeframe
+    // effectively covers the entire lifetime. This ensures consistency with the chart.
+    const chartData = await this.getChartData(installationId, 'year');
     
-    if (readings.length === 0 || !installation) {
-      console.log('No readings found or installation not found for lifetime production calculation');
-      return 0;
-    }
-
-    // Sort readings by timestamp to ensure correct order
-    const sortedReadings = readings.sort((a, b) => a.timestamp - b.timestamp);
-    
-    // Get the installation creation time as the starting point
-    const installationCreatedAt = new Date(installation.created_at);
-    const installationTimestamp = Math.floor(installationCreatedAt.getTime() / 1000);
-    
-    // Find the first reading after installation creation
-    const firstReadingAfterInstallation = sortedReadings.find(reading => reading.timestamp >= installationTimestamp);
-    const latestReading = sortedReadings[sortedReadings.length - 1];
-    
-    if (!firstReadingAfterInstallation) {
-      console.log('No readings found after installation creation');
-      return 0;
-    }
-    
-    // Calculate energy production since installation
-    const energySinceInstallation = latestReading.total_wh - firstReadingAfterInstallation.total_wh;
-    
-    // Also calculate the sum of differences for comparison
-    let sumOfDifferencesWh = 0;
-    for (let i = 1; i < sortedReadings.length; i++) {
-      const currentReading = sortedReadings[i];
-      const previousReading = sortedReadings[i - 1];
-      const energyProduced = currentReading.total_wh - previousReading.total_wh;
-      if (energyProduced > 0) {
-        sumOfDifferencesWh += energyProduced;
-      }
-    }
-
-    console.log('Lifetime production calculation details:', {
-      totalReadings: sortedReadings.length,
-      // Energy since installation
-      energySinceInstallationWh: energySinceInstallation,
-      energySinceInstallationKWh: energySinceInstallation / 1000,
-      // Installation details
-      installationCreatedAt: installation.created_at,
-      installationTimestamp: installationTimestamp,
-      // Cumulative total from Shelly device (for reference)
-      cumulativeTotalWh: latestReading.total_wh,
-      cumulativeTotalKWh: latestReading.total_wh / 1000,
-      // Sum of differences calculation (for comparison)
-      sumOfDifferencesWh: sumOfDifferencesWh,
-      sumOfDifferencesKWh: sumOfDifferencesWh / 1000,
-      firstReadingAfterInstallation: {
-        id: firstReadingAfterInstallation.id,
-        timestamp: firstReadingAfterInstallation.timestamp,
-        total_wh: firstReadingAfterInstallation.total_wh,
-        date: new Date(firstReadingAfterInstallation.timestamp * 1000).toISOString()
-      },
-      latestReading: {
-        id: latestReading.id,
-        timestamp: latestReading.timestamp,
-        total_wh: latestReading.total_wh,
-        date: new Date(latestReading.timestamp * 1000).toISOString()
-      },
-      timeSpanDays: (latestReading.timestamp - firstReadingAfterInstallation.timestamp) / (24 * 3600)
-    });
-
-    // Return the energy production since installation
-    return Math.abs(energySinceInstallation); // Use absolute value to keep it positive
+    console.log(`Lifetime production from chart API: ${chartData.total_energy} Wh`);
+    return chartData.total_energy;
   },
 
   // Get chart data for EnergyChart component

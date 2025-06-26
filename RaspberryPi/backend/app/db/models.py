@@ -56,4 +56,33 @@ class Token(Base):
     transaction_hash = Column(String)  # Blockchain transaction hash
     
     # Relationships
-    installation = relationship("SolarInstallation", back_populates="tokens") 
+    installation = relationship("SolarInstallation", back_populates="tokens")
+
+class PowerReadingAggregate(Base):
+    __tablename__ = "power_reading_aggregates"
+
+    id = Column(Integer, primary_key=True, index=True)
+    installation_id = Column(Integer, ForeignKey("solar_installations.id"))
+    
+    # Time bucket (10-minute intervals)
+    time_bucket = Column(BigInteger, index=True)  # Unix timestamp rounded to 10-min
+    start_timestamp = Column(BigInteger)  # First reading in bucket
+    end_timestamp = Column(BigInteger)    # Last reading in bucket
+    
+    # Aggregated power data
+    avg_power_w = Column(Float)      # Average power in bucket
+    min_power_w = Column(Float)      # Minimum power in bucket  
+    max_power_w = Column(Float)      # Maximum power in bucket
+    total_energy_wh = Column(Float)  # Energy produced in bucket
+    reading_count = Column(Integer)  # Number of original readings
+    
+    # Blockchain reference
+    blockchain_tx_hash = Column(String)  # Transaction containing this data
+    blockchain_block_number = Column(Integer)
+    
+    # Metadata
+    created_at = Column(DateTime, default=datetime.utcnow)
+    aggregated_at = Column(DateTime)  # When aggregation was performed
+    
+    # Relationships
+    installation = relationship("SolarInstallation") 

@@ -5,12 +5,23 @@ import { api, PowerReading } from '../services/api';
 // Hook to get the first available installation ID
 export const useInstallation = () => {
   return useQuery({
-    queryKey: ['installations'],
+    queryKey: ['installations', 'v2'],
     queryFn: api.getInstallations,
     select: (installations) => {
-      // Find the installation with a non-empty shelly_mac (the real one)
-      const realInstallation = installations.find(inst => inst.shelly_mac && inst.shelly_mac.trim() !== '');
-      return realInstallation || installations[0]; // Fallback to first if none found
+      // Find the installation with the actual ESP32 MAC address (EC64C9C05E97)
+      const realInstallation = installations.find(inst => inst.shelly_mac === 'EC64C9C05E97');
+      
+      // Fallback: find first installation with non-empty, non-test MAC
+      if (!realInstallation) {
+        const nonTestInstallation = installations.find(inst => 
+          inst.shelly_mac && 
+          inst.shelly_mac.trim() !== '' && 
+          !inst.shelly_mac.startsWith('TEST')
+        );
+        return nonTestInstallation || installations[0];
+      }
+      
+      return realInstallation;
     },
     staleTime: 5 * 60 * 1000, // 5 minutes - installations don't change often
     refetchInterval: false, // Don't refetch installations automatically
@@ -110,7 +121,7 @@ export const useLifetimeProduction = (installationId: number | undefined) => {
 // Hook to get chart data for EnergyChart component
 export const useChartData = (installationId: number | undefined, timeFrame: string) => {
   return useQuery({
-    queryKey: ['chart-data', installationId, timeFrame],
+    queryKey: ['chart-data', installationId, timeFrame, 'v2'],
     queryFn: () => api.getChartData(installationId!, timeFrame),
     enabled: !!installationId,
     staleTime: 0, // Always consider data stale

@@ -6,7 +6,7 @@ import json
 import base64
 
 from app.db.database import get_db
-from app.db.models import PowerReading, SolarInstallation
+from app.db.models import PowerReading, SolarInstallation, PowerReadingAggregate
 from pydantic import BaseModel
 
 router = APIRouter()
@@ -62,30 +62,21 @@ def extract_shelly_mac(shelly_payload: str) -> str:
         if padding != 4:
             shelly_payload += "=" * padding
         
-        print(f"Attempting to decode base64 payload (length: {len(shelly_payload)})")
-        
         # Decode base64 payload
         decoded_bytes = base64.b64decode(shelly_payload)
-        print(f"Decoded {len(decoded_bytes)} bytes")
         
         # Try to decode as UTF-8
         try:
             decoded_payload = decoded_bytes.decode('utf-8')
-            print(f"Decoded as UTF-8: {decoded_payload[:100]}...")  # First 100 chars
-        except UnicodeDecodeError as e:
-            print(f"UTF-8 decode failed: {e}")
-            print(f"Raw bytes (hex): {decoded_bytes[:50].hex()}...")  # First 50 bytes as hex
+        except UnicodeDecodeError:
             return ""
         
         # Parse JSON
         data = json.loads(decoded_payload)
         mac = data.get("mac", "")
-        print(f"Successfully extracted MAC: {mac}")
         return mac
         
-    except Exception as e:
-        print(f"Error extracting MAC: {e}")
-        print(f"Input payload: {shelly_payload[:50]}...")  # First 50 chars
+    except Exception:
         return ""
 
 @router.get("/installations/", response_model=List[InstallationResponse])
@@ -113,11 +104,8 @@ def get_installations(db: Session = Depends(get_db)):
 def create_installation(installation: InstallationCreate, db: Session = Depends(get_db)):
     """Create a new solar installation (called once at ESP32 startup)"""
     
-    print(f"Received installation request: {installation.name}")
-    
     # Extract ShellyEM MAC address
     shelly_mac = extract_shelly_mac(installation.shelly_payload)
-    print(f"Extracted MAC: {shelly_mac}")
     
     # Check if installation already exists (by MAC address OR public key)
     existing_by_mac = db.query(SolarInstallation).filter(
@@ -131,7 +119,6 @@ def create_installation(installation: InstallationCreate, db: Session = Depends(
     if existing_by_mac or existing_by_key:
         # Update existing installation (use whichever one exists)
         existing = existing_by_mac if existing_by_mac else existing_by_key
-        print(f"Updating existing installation: {existing.id}")
         
         # Update all fields
         existing.public_key = installation.public_key
@@ -152,7 +139,6 @@ def create_installation(installation: InstallationCreate, db: Session = Depends(
             "is_active": existing.is_active
         }
     
-    print(f"Creating new installation with MAC: {shelly_mac}")
     # Create new installation
     db_installation = SolarInstallation(
         name=installation.name,
@@ -165,7 +151,6 @@ def create_installation(installation: InstallationCreate, db: Session = Depends(
         db.add(db_installation)
         db.commit()
         db.refresh(db_installation)
-        print(f"Successfully created installation: {db_installation.id}")
         return {
             "id": db_installation.id,
             "name": db_installation.name,
@@ -176,7 +161,6 @@ def create_installation(installation: InstallationCreate, db: Session = Depends(
             "is_active": db_installation.is_active
         }
     except Exception as e:
-        print(f"Error creating installation: {e}")
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
@@ -259,10 +243,6 @@ def get_power_readings(
     start_timestamp = int(start_time.timestamp())
     end_timestamp = int(end_time.timestamp())
     
-    print(f"Filtering readings for installation {installation_id}:")
-    print(f"  Start time: {start_time} (Unix: {start_timestamp})")
-    print(f"  End time: {end_time} (Unix: {end_timestamp})")
-    
     # Build query - use timestamp field (ESP32 timestamp) instead of created_at
     query = db.query(PowerReading).filter(
         PowerReading.installation_id == installation_id,
@@ -277,8 +257,6 @@ def get_power_readings(
     # Get readings
     readings = query.order_by(PowerReading.timestamp.desc()).all()
     
-    print(f"Found {len(readings)} readings in time range")
-    
     # Convert SQLAlchemy objects to Pydantic models
     return [PowerReadingResponse.from_orm(reading) for reading in readings]
 
@@ -289,7 +267,6 @@ def get_all_power_readings(
     db: Session = Depends(get_db)
 ):
     """Get ALL power readings for a specific installation (for lifetime calculations)"""
-    print(f"Getting ALL readings for installation {installation_id} (lifetime calculation)")
     
     # Build query - no time limits
     query = db.query(PowerReading).filter(
@@ -302,8 +279,6 @@ def get_all_power_readings(
     
     # Get all readings
     readings = query.order_by(PowerReading.timestamp.desc()).all()
-    
-    print(f"Found {len(readings)} total readings for lifetime calculation")
     
     # Convert SQLAlchemy objects to Pydantic models
     return [PowerReadingResponse.from_orm(reading) for reading in readings]
@@ -391,8 +366,24 @@ def get_chart_data(
         interval_seconds = 86400  # 1 day
         label_format = "%b %d"  # Jan 15, etc.
     elif time_frame == "year":
-        start_timestamp = reference_timestamp - 31536000  # 365 days ago
-        interval_seconds = 2592000  # 30 days
+        # For year view, we need proper month boundaries, not fixed 30-day intervals
+        # Start from the beginning of the month 12 months ago
+        reference_dt = datetime.utcfromtimestamp(reference_timestamp)
+        
+        # Go back 12 months to get the start month
+        if reference_dt.month <= 12:
+            start_year = reference_dt.year - 1
+            start_month = reference_dt.month
+        else:
+            start_year = reference_dt.year
+            start_month = reference_dt.month - 12
+        
+        # Create start of the start month
+        start_dt = datetime(start_year, start_month, 1)
+        start_timestamp = int(start_dt.timestamp())
+        
+        # We'll handle month buckets differently - not using fixed intervals
+        interval_seconds = None  # Will be calculated per month
         label_format = "%b"  # Jan, Feb, etc.
     else:
         raise HTTPException(status_code=400, detail="Invalid time frame. Use: hour, day, week, month, year")
@@ -415,41 +406,183 @@ def get_chart_data(
     data_points = []
     total_energy = 0.0
     
-    # Create time buckets for the entire range, even if empty
-    current_time = start_timestamp
-    while current_time < end_timestamp:
-        bucket_end = min(current_time + interval_seconds, end_timestamp)
+    # Only create buckets if we have readings data to avoid phantom historical data
+    if not readings:
+        return ChartDataResponse(
+            data_points=[],
+            time_frame=time_frame,
+            total_energy=0.0
+        )
+    
+    # Find the earliest reading to determine when the system actually started
+    first_reading_time = min(r.timestamp for r in readings)
+    
+    # Handle year view with proper month boundaries
+    if time_frame == "year":
+        # Create month buckets with proper boundaries
+        reference_dt = datetime.utcfromtimestamp(reference_timestamp)
+        start_dt = datetime.utcfromtimestamp(start_timestamp)
         
-        # Find readings in this time bucket
-        bucket_readings = [
-            r for r in readings 
-            if current_time <= r.timestamp < bucket_end
-        ]
-        
-        bucket_energy = 0.0
-        if len(bucket_readings) >= 2:
-            for i in range(1, len(bucket_readings)):
-                current_reading = bucket_readings[i]
-                previous_reading = bucket_readings[i-1]
-                time_diff_hours = (current_reading.timestamp - previous_reading.timestamp) / 3600
-                average_power = (current_reading.power_w + previous_reading.power_w) / 2
-                energy = average_power * time_diff_hours
-                bucket_energy += abs(energy)
-            total_energy += bucket_energy
-        
-        # Create label for this bucket
-        bucket_time = datetime.fromtimestamp(current_time)
-        label = bucket_time.strftime(label_format)
-        
-        data_points.append(ChartDataPoint(
-            label=label,
-            value=bucket_energy,
-            timestamp=current_time
-        ))
-        current_time = bucket_end
+        current_dt = start_dt
+        while current_dt <= reference_dt:
+            # Calculate month boundaries
+            current_time = int(current_dt.timestamp())
+            
+            # Next month
+            if current_dt.month == 12:
+                next_dt = datetime(current_dt.year + 1, 1, 1)
+            else:
+                next_dt = datetime(current_dt.year, current_dt.month + 1, 1)
+            
+            bucket_end = min(int(next_dt.timestamp()), end_timestamp)
+            
+            # Find readings in this month bucket
+            bucket_readings = [
+                r for r in readings 
+                if current_time <= r.timestamp < bucket_end
+            ]
+            
+            bucket_energy = 0.0
+            if len(bucket_readings) >= 2:
+                for i in range(1, len(bucket_readings)):
+                    current_reading = bucket_readings[i]
+                    previous_reading = bucket_readings[i-1]
+                    time_diff_hours = (current_reading.timestamp - previous_reading.timestamp) / 3600
+                    average_power = (current_reading.power_w + previous_reading.power_w) / 2
+                    energy = average_power * time_diff_hours
+                    bucket_energy += abs(energy)
+                
+                total_energy += bucket_energy
+            
+            # Create label for this bucket
+            label = current_dt.strftime(label_format)
+            
+            data_points.append(ChartDataPoint(
+                label=label,
+                value=bucket_energy,
+                timestamp=current_time
+            ))
+            
+            # Move to next month
+            current_dt = next_dt
+    else:
+        # Handle other time frames with fixed intervals
+        current_time = start_timestamp
+        while current_time < end_timestamp:
+            bucket_end = min(current_time + interval_seconds, end_timestamp)
+            
+            # Find readings in this time bucket
+            bucket_readings = [
+                r for r in readings 
+                if current_time <= r.timestamp < bucket_end
+            ]
+            
+            bucket_energy = 0.0
+            if len(bucket_readings) >= 2:
+                for i in range(1, len(bucket_readings)):
+                    current_reading = bucket_readings[i]
+                    previous_reading = bucket_readings[i-1]
+                    time_diff_hours = (current_reading.timestamp - previous_reading.timestamp) / 3600
+                    average_power = (current_reading.power_w + previous_reading.power_w) / 2
+                    energy = average_power * time_diff_hours
+                    bucket_energy += abs(energy)
+                
+                total_energy += bucket_energy
+            
+            # Create label for this bucket
+            bucket_time = datetime.fromtimestamp(current_time)
+            label = bucket_time.strftime(label_format)
+            
+            data_points.append(ChartDataPoint(
+                label=label,
+                value=bucket_energy,
+                timestamp=current_time
+            ))
+            current_time = bucket_end
     
     return ChartDataResponse(
         data_points=data_points,
         time_frame=time_frame,
         total_energy=total_energy
-    ) 
+    )
+
+@router.get("/readings/{installation_id}/optimized", response_model=List[PowerReadingResponse])
+def get_optimized_readings(
+    installation_id: int,
+    start_time: datetime = None,
+    end_time: datetime = None,
+    max_points: int = 1000,
+    verified_only: bool = True,
+    db: Session = Depends(get_db)
+):
+    """Get optimized readings using aggregates when available, raw readings when recent"""
+    # Set default time range if not provided
+    if not end_time:
+        end_time = datetime.utcnow()
+    if not start_time:
+        start_time = end_time - timedelta(hours=24)
+    
+    # Convert datetime to Unix timestamps
+    start_timestamp = int(start_time.timestamp())
+    end_timestamp = int(end_time.timestamp())
+    
+    # Strategy: Use aggregates for data older than 24 hours, raw readings for recent data
+    cutoff_time = datetime.utcnow() - timedelta(hours=24)
+    cutoff_timestamp = int(cutoff_time.timestamp())
+    
+    results = []
+    
+    # Get aggregated data for older periods
+    if start_timestamp < cutoff_timestamp:
+        aggregate_end = min(cutoff_timestamp, end_timestamp)
+        
+        aggregates = db.query(PowerReadingAggregate).filter(
+            PowerReadingAggregate.installation_id == installation_id,
+            PowerReadingAggregate.time_bucket >= start_timestamp,
+            PowerReadingAggregate.time_bucket <= aggregate_end
+        ).order_by(PowerReadingAggregate.time_bucket.desc()).all()
+        
+        # Convert aggregates to reading-like format
+        for agg in aggregates:
+            # Use average values from aggregate
+            reading_dict = {
+                "id": f"agg_{agg.id}",  # Mark as aggregate
+                "installation_id": agg.installation_id,
+                "power_w": agg.avg_power_w,
+                "total_wh": agg.total_energy_wh,  # Use bucket energy
+                "timestamp": agg.time_bucket,
+                "signature": "aggregate",  # Mark as aggregate
+                "is_verified": True,
+                "verification_timestamp": agg.aggregated_at,
+                "is_on_chain": True,  # Aggregates are from on-chain data
+                "blockchain_tx_hash": agg.blockchain_tx_hash,
+                "blockchain_block_number": agg.blockchain_block_number,
+                "created_at": agg.created_at
+            }
+            results.append(PowerReadingResponse(**reading_dict))
+    
+    # Get raw readings for recent period (last 24 hours)
+    if end_timestamp > cutoff_timestamp:
+        raw_start = max(start_timestamp, cutoff_timestamp)
+        
+        raw_query = db.query(PowerReading).filter(
+            PowerReading.installation_id == installation_id,
+            PowerReading.timestamp >= raw_start,
+            PowerReading.timestamp <= end_timestamp
+        )
+        
+        if verified_only:
+            raw_query = raw_query.filter(PowerReading.is_verified == True)
+        
+        raw_readings = raw_query.order_by(PowerReading.timestamp.desc()).all()
+        
+        # Sample raw readings if too many
+        if len(raw_readings) > max_points:
+            sample_interval = len(raw_readings) // max_points
+            raw_readings = raw_readings[::sample_interval]
+        
+        # Convert to response format
+        for reading in raw_readings:
+            results.append(PowerReadingResponse.from_orm(reading))
+    
+    return results 
