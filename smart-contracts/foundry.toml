@@ -14,5 +14,11 @@ remappings = [
 # Network configurations
 [rpc_endpoints]
 fuji = "${AVALANCHE_FUJI_RPC}"
+avalanche = "${AVLANACHE_MAINET_RPC}"
+
+# Verification configuration for Snowtrace
+[etherscan]
+fuji = { key = "${AVALANCHE_FUJI_ETHERSCAN_API_KEY}", url = "https://api-testnet.snowtrace.io/api", chain = 43113 }
+avalanche = { key = "${AVALANCHE_MAINNET_ETHERSCAN_API_KEY}", url = "https://api.snowtrace.io/api", chain = 43114 }
 
 # See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options
