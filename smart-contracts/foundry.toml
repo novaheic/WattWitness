@@ -1,12 +1,18 @@
 [profile.default]
 src = "src"
 out = "artifacts"
-libs = ["node_modules"]
+libs = ["lib"]
 remappings = [
+    "forge-std/=lib/forge-std/src/",
+    "chainlink/=lib/chainlink/",
     "@chainlink/=node_modules/@chainlink/",
     "@eth-optimism/=node_modules/@eth-optimism/",
     "@openzeppelin/=node_modules/@openzeppelin/",
     "hardhat/=node_modules/hardhat/",
 ]
+
+# Network configurations
+[rpc_endpoints]
+fuji = "${AVALANCHE_FUJI_RPC}"
 
 # See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options
