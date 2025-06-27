@@ -1,5 +1,12 @@
 {
   "dependencies": {
     "framer-motion": "^12.18.1"
+  },
+  "devDependencies": {
+    "localtunnel": "^2.0.2"
+  },
+  "scripts": {
+    "tunnel": "lt --port 8000",
+    "tunnel:custom": "lt --port 8000 --subdomain wattwitness-api"
   }
 }
