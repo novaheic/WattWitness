@@ -1,5 +1,5 @@
 import React from 'react';
-import { useInstallation, useLatestReading, useWeeklyAverage } from '../hooks/usePowerData';
+import { useInstallation, useLatestReading, useWeeklyAverage, useESP32Status } from '../hooks/usePowerData';
 
 interface PowerOutputProps {
   isOnline?: boolean;
@@ -10,6 +10,9 @@ export const PowerOutput: React.FC<PowerOutputProps> = ({
 }) => {
   // Get installation data
   const { data: installation, isLoading: installationLoading, error: installationError } = useInstallation();
+  
+  // Get ESP32 status (same logic as SystemStatus)
+  const { data: energyMeterLive = false, isLoading: esp32Loading } = useESP32Status(installation?.id);
   
   // Get latest power reading
   const { 
@@ -58,8 +61,9 @@ export const PowerOutput: React.FC<PowerOutputProps> = ({
     );
   }
 
-  // Convert watts to kilowatts for display
-  const currentPower = latestReading ? latestReading.power_w / 1000 : 0;
+  // Use ESP32 status to determine if device is online and what power to show
+  const isDeviceOnline = energyMeterLive;
+  const currentPower = (isDeviceOnline && latestReading) ? latestReading.power_w / 1000 : 0;
   const weeklyAvg = weeklyAverage ? weeklyAverage / 1000 : 0;
   
   // Number of scale lines
@@ -82,7 +86,7 @@ export const PowerOutput: React.FC<PowerOutputProps> = ({
     <div className="h-full flex flex-col">
       <div className="flex items-center gap-2 mb-4">
         <h2 className="text-2xl font-medium text-gray-900">Power Output</h2>
-        <div className={`w-2 h-2 rounded-full ${isOnline ? 'bg-green-500' : 'bg-red-500'}`} />
+        <div className={`w-2 h-2 rounded-full ${isDeviceOnline ? 'bg-green-500' : 'bg-red-500'}`} />
       </div>
 
       <div className="relative flex-1 flex flex-col items-center justify-center">
@@ -111,9 +115,15 @@ export const PowerOutput: React.FC<PowerOutputProps> = ({
           className="absolute transform -translate-y-16"
           style={{ left: `${currentPosition}%` }}
         >
-          <div className="bg-white border border-gray-200 rounded-lg px-3 py-2 relative" style={{ boxShadow: '0 0 13px 0 rgba(0, 0, 0, 0.08)' }}>
-            <div className="text-gray-500 text-xs">Real-Time:</div>
-            <div className="text-lg font-medium text-gray-900">
+          <div className={`border border-gray-200 rounded-lg px-3 py-2 relative ${
+            isDeviceOnline ? 'bg-white' : 'bg-gray-100'
+          }`} style={{ boxShadow: '0 0 13px 0 rgba(0, 0, 0, 0.08)' }}>
+            <div className="text-gray-500 text-xs">
+              {isDeviceOnline ? 'Real-Time:' : 'Offline:'}
+            </div>
+            <div className={`text-lg font-medium ${
+              isDeviceOnline ? 'text-gray-900' : 'text-gray-500'
+            }`}>
               {currentPower >= 0.1
                 ? `${currentPower.toFixed(2)} kW`
                 : `${(currentPower * 1000).toFixed(1)} W`
@@ -124,7 +134,7 @@ export const PowerOutput: React.FC<PowerOutputProps> = ({
               className="absolute top-full left-1/2 transform -translate-x-1/2 w-4 h-4 rotate-180" 
               viewBox="0 0 16 16"
             >
-              <polygon points="8,0 0,16 16,16" fill="white" />
+              <polygon points="8,0 0,16 16,16" fill={isDeviceOnline ? "white" : "#f3f4f6"} />
             </svg>
           </div>
         </div>

@@ -3,7 +3,7 @@
     "localtunnel": "^2.0.2"
   },
   "scripts": {
-    "tunnel": "lt --port 8000",
-    "tunnel:custom": "lt --port 8000 --subdomain wattwitness-api"
+    "tunnel": "lt --port 8000 --subdomain wattwitness",
+    "tunnel:random": "lt --port 8000"
   }
 }
