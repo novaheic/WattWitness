@@ -90,7 +90,7 @@ export const EnergyChart: React.FC = () => {
   const [chartWidth, setChartWidth] = useState(0);
 
   // Get installation and production data
-  const { data: installation, isLoading: installationLoading } = useInstallation();
+  const { data: installation } = useInstallation();
   const { data: totalProduction, isLoading: totalProductionLoading, error: totalProductionError } = useTotalProduction(
     installation?.id, 
     selectedTimeFrame.name
