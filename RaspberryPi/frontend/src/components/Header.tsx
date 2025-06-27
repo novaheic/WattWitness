@@ -13,8 +13,6 @@ export const Header: React.FC = () => {
           <div className="flex items-center">
             <a 
               href="https://wattwitness.com/" 
-              target="_blank" 
-              rel="noopener noreferrer"
               className="hover:opacity-100 transition-opacity cursor-pointer"
             >
               <img src={logo} alt="WattWitness" className="h-24 w-auto" />

@@ -3,6 +3,8 @@ import { useInstallation, useDeviceInfo, useLatestReading } from '../hooks/usePo
 
 export const GeneralInfo: React.FC = () => {
   const [currentTime, setCurrentTime] = useState<number>(Date.now());
+  const [copySuccess, setCopySuccess] = useState(false);
+  const [showCopyAnimation, setShowCopyAnimation] = useState(false);
 
   // Get installation data
   const { data: installation, isLoading: installationLoading, error: installationError } = useInstallation();
@@ -38,6 +40,38 @@ export const GeneralInfo: React.FC = () => {
       const hours = Math.floor(timeSinceLastPing / 3600);
       const minutes = Math.floor((timeSinceLastPing % 3600) / 60);
       return `${hours}h${minutes}m`;
+    }
+  };
+
+  // Copy public key to clipboard
+  const copyToClipboard = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopySuccess(true);
+      setShowCopyAnimation(true);
+      
+      // Start fade out after 1 second
+      setTimeout(() => setShowCopyAnimation(false), 1000);
+      // Remove completely after animation finishes
+      setTimeout(() => setCopySuccess(false), 1500);
+    } catch (err) {
+      console.error('Failed to copy: ', err);
+      // Fallback for older browsers
+      const textArea = document.createElement('textarea');
+      textArea.value = text;
+      document.body.appendChild(textArea);
+      textArea.focus();
+      textArea.select();
+      try {
+        document.execCommand('copy');
+        setCopySuccess(true);
+        setShowCopyAnimation(true);
+        setTimeout(() => setShowCopyAnimation(false), 1000);
+        setTimeout(() => setCopySuccess(false), 1500);
+      } catch (fallbackErr) {
+        console.error('Fallback copy failed: ', fallbackErr);
+      }
+      document.body.removeChild(textArea);
     }
   };
 
@@ -80,12 +114,42 @@ export const GeneralInfo: React.FC = () => {
     return key;
   };
 
+  // Public Key Display Component with Copy Button
+  const PublicKeyDisplay = ({ publicKey }: { publicKey: string }) => (
+    <div className="relative flex items-center gap-2">
+      <span className="text-gray-900 font-medium text-sm">
+        {truncatePublicKey(publicKey)}
+      </span>
+      <button
+        onClick={() => copyToClipboard(publicKey)}
+        className="text-gray-500 hover:text-gray-700 transition-colors"
+        title="Copy public key"
+      >
+        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+        </svg>
+      </button>
+      {copySuccess && (
+        <div className={`absolute top-6 right-0 bg-green-500 text-white px-2 py-1 rounded text-xs z-10 transition-opacity duration-500 ${
+          showCopyAnimation ? 'opacity-100' : 'opacity-0'
+        }`}>
+          <div className="flex items-center gap-1">
+            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+            </svg>
+            Copied!
+          </div>
+        </div>
+      )}
+    </div>
+  );
+
   const rows = [
-    { label: "Device Name/ID", value: deviceInfo?.deviceName || "Unknown" },
-    { label: "ATECC608A Public Key", value: truncatePublicKey(deviceInfo?.publicKey || "Unknown") },
-    { label: "Shelly EM Mac Address", value: deviceInfo?.macAddress || "Unknown" },
-    { label: "Time Since Last Ping", value: getRealTimeLastPing() },
-    { label: "Last Boot Time", value: deviceInfo?.lastBoot || "Unknown" },
+    { label: "Device Name/ID", value: deviceInfo?.deviceName || "Unknown", isPublicKey: false },
+    { label: "ATECC608A Public Key", value: deviceInfo?.publicKey || "Unknown", isPublicKey: true },
+    { label: "Shelly EM Mac Address", value: deviceInfo?.macAddress || "Unknown", isPublicKey: false },
+    { label: "Time Since Last Ping", value: getRealTimeLastPing(), isPublicKey: false },
+    { label: "Last Boot Time", value: deviceInfo?.lastBoot || "Unknown", isPublicKey: false },
   ];
 
   return (
@@ -102,7 +166,11 @@ export const GeneralInfo: React.FC = () => {
             }`}
           >
             <div className="flex-1 text-gray-600 text-sm">{row.label}</div>
-            <div className="text-gray-900 font-medium text-sm">{row.value}</div>
+            {row.isPublicKey ? (
+              <PublicKeyDisplay publicKey={row.value} />
+            ) : (
+              <div className="text-gray-900 font-medium text-sm">{row.value}</div>
+            )}
           </div>
         ))}
       </div>
