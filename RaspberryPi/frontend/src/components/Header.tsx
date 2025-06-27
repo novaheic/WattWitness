@@ -11,7 +11,14 @@ export const Header: React.FC = () => {
       <div className="max-w-[1920px] w-full mx-auto px-24 lg:px-48 xl:px-64 2xl:px-80">
         <div className="h-24 flex items-center justify-between">
           <div className="flex items-center">
-            <img src={logo} alt="WattWitness" className="h-24 w-auto" />
+            <a 
+              href="https://wattwitness.com/" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="hover:opacity-100 transition-opacity cursor-pointer"
+            >
+              <img src={logo} alt="WattWitness" className="h-24 w-auto" />
+            </a>
           </div>
           <div className="flex items-center space-x-6">
             <button 
