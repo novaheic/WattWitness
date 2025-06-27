@@ -25,7 +25,7 @@ export const Dashboard: React.FC = () => {
 
           {/* Bottom row */}
           <div className="p-6">
-            <PowerOutput isOnline={true} />
+            <PowerOutput />
           </div>
           <div className="rounded-[26px]">
             <GeneralInfo />

@@ -1,18 +1,12 @@
 import React from 'react';
 import { useInstallation, useLatestReading, useWeeklyAverage, useESP32Status } from '../hooks/usePowerData';
 
-interface PowerOutputProps {
-  isOnline?: boolean;
-}
-
-export const PowerOutput: React.FC<PowerOutputProps> = ({ 
-  isOnline = true 
-}) => {
+export const PowerOutput: React.FC = () => {
   // Get installation data
   const { data: installation, isLoading: installationLoading, error: installationError } = useInstallation();
   
   // Get ESP32 status (same logic as SystemStatus)
-  const { data: energyMeterLive = false, isLoading: esp32Loading } = useESP32Status(installation?.id);
+  const { data: energyMeterLive = false } = useESP32Status(installation?.id);
   
   // Get latest power reading
   const { 
