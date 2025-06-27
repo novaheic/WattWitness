@@ -25,13 +25,33 @@ if [ "$1" == "solarpark-auto" ]; then
     exit $?
 fi
 
+# Special case for automated solarpark auto-encoding deployment
+if [ "$1" == "automated-solarpark-auto" ]; then
+    echo "🤖 Starting WattWitness AutomatedSolarpark Auto-Deployment..."
+    echo "📋 This will automatically encode CBOR and deploy with Chainlink Automation support"
+    echo ""
+    
+    # Check if Node.js deployment script exists
+    if [ ! -f "deployAutomatedSolarpark.js" ]; then
+        echo "❌ Error: deployAutomatedSolarpark.js not found"
+        echo "Please ensure the Node.js automated deployment script is present"
+        exit 1
+    fi
+    
+    # Execute Node.js auto-deployment for automation
+    node deployAutomatedSolarpark.js
+    exit $?
+fi
+
 if [ $# -lt 2 ]; then
     echo "Usage: $0 <script_name> <contract_name>"
     echo "Available scripts:"
     echo "  - DeployGettingStarted GettingStartedFunctionsConsumer"
     echo "  - DeployFunctionsConsumerExample FunctionsConsumerExample"
     echo "  - DeployAutomatedFunctionsConsumerExample AutomatedFunctionsConsumerExample"
+    echo "  - DeployAutomatedSolarpark AutomatedSolarpark"
     echo "  - solarpark-auto (WattWitness auto-encoding deployment)"
+    echo "  - automated-solarpark-auto (WattWitness automated auto-encoding deployment)"
     exit 1
 fi
 
