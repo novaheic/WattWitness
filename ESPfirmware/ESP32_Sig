@@ -1,6 +1,7 @@
 #include <Wire.h>
 #include <WiFi.h>
 #include <HTTPClient.h>
+#include <WiFiClientSecure.h>
 #include <Arduino.h>
 #include <ArduinoECCX08.h>
 #include <base64.h>
@@ -9,16 +10,18 @@
 const char* ssid = "Ondemand";            // <-- CHANGE THIS
 const char* password = "";      // <-- CHANGE THIS
 const char* shellyHost = "192.168.178.156"; // <-- CHANGE THIS
-const char* backendHost = "192.168.178.152"; // <-- CHANGE THIS
+const char* backendHost = "wattwitness-api.loca.lt"; // <-- UPDATED TO TUNNEL URL
 
 bool initialSetupSent = false;
 
 void sendInitialSetup() {
   if (initialSetupSent) return;
   
+  WiFiClientSecure client;
+  client.setInsecure(); // For development - in production, use proper certificate validation
   HTTPClient http;
-  String url = String("http://") + backendHost + ":8000/api/v1/installations/";
-  http.begin(url);
+  String url = String("https://") + backendHost + "/api/v1/installations/"; // <-- CHANGED TO HTTPS
+  http.begin(client, url);
   http.addHeader("Content-Type", "application/json");
   
   // Get the public key
@@ -156,9 +159,11 @@ void fetchAndSignTelemetry() {
       jsonPayload += "}";
 
       // Send to backend
+      WiFiClientSecure secureClient;
+      secureClient.setInsecure(); // For development - in production, use proper certificate validation
       HTTPClient postHttp;
-      String backendUrl = String("http://") + backendHost + ":8000/api/v1/readings/";
-      postHttp.begin(backendUrl);
+      String backendUrl = String("https://") + backendHost + "/api/v1/readings/"; // <-- CHANGED TO HTTPS
+      postHttp.begin(secureClient, backendUrl);
       postHttp.addHeader("Content-Type", "application/json");
       int postCode = postHttp.POST(jsonPayload);
       if (postCode > 0) {
