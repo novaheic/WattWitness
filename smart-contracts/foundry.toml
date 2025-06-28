@@ -2,6 +2,7 @@
 src = "src"
 out = "artifacts"
 libs = ["lib"]
+fs_permissions = [{ access = "read", path = "./chainlink-functions" }]
 remappings = [
     "forge-std/=lib/forge-std/src/",
     "chainlink/=lib/chainlink/",
