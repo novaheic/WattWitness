@@ -224,6 +224,107 @@ def create_power_reading(reading: PowerReadingCreate, db: Session = Depends(get_
         "created_at": db_reading.created_at
     }
 
+# New Pydantic models for blockchain integration
+class BlockchainUpdateRequest(BaseModel):
+    first_reading_id: int  # First reading ID in the range to mark as on-chain
+    last_reading_id: int   # Last reading ID in the range to mark as on-chain
+    blockchain_tx_hash: str  # Transaction hash from the blockchain
+    blockchain_block_number: int = None  # Optional block number
+
+class PendingReadingsResponse(BaseModel):
+    readings: List[List]  # Array of arrays: [id, power_w, total_wh, timestamp, signature]
+    first_reading_id: int = None  # First reading ID in the batch
+    last_reading_id: int = None   # Last reading ID in the batch
+    count: int  # Total number of pending readings
+
+@router.get("/readings/pending", response_model=PendingReadingsResponse)
+def get_pending_readings(db: Session = Depends(get_db)):
+    """
+    Get all power readings that haven't been saved on-chain yet.
+    Returns readings data plus metadata about the range for batch processing.
+    """
+    # Query for readings that are verified but not yet on-chain
+    readings = db.query(PowerReading).filter(
+        PowerReading.is_verified == True,
+        PowerReading.is_on_chain == False
+    ).order_by(PowerReading.id.asc()).all()  # Order by ID for consistent range
+    
+    if not readings:
+        return PendingReadingsResponse(
+            readings=[],
+            first_reading_id=None,
+            last_reading_id=None,
+            count=0
+        )
+    
+    # Convert to array of arrays format
+    result = []
+    for reading in readings:
+        result.append([
+            reading.id,
+            reading.power_w,
+            reading.total_wh,
+            reading.timestamp,
+            reading.signature
+        ])
+    
+    return PendingReadingsResponse(
+        readings=result,
+        first_reading_id=readings[0].id,
+        last_reading_id=readings[-1].id,
+        count=len(readings)
+    )
+
+@router.post("/readings/mark-on-chain")
+def mark_readings_on_chain(request: BlockchainUpdateRequest, db: Session = Depends(get_db)):
+    """
+    Mark readings as saved on-chain and store the transaction hash.
+    Updates is_on_chain to true and saves blockchain_tx_hash for readings in the specified range.
+    """
+    if not request.blockchain_tx_hash:
+        raise HTTPException(status_code=400, detail="Transaction hash is required")
+    
+    if request.first_reading_id > request.last_reading_id:
+        raise HTTPException(status_code=400, detail="First reading ID must be less than or equal to last reading ID")
+    
+    # Find all readings in the specified range that are verified but not on-chain
+    readings = db.query(PowerReading).filter(
+        PowerReading.id >= request.first_reading_id,
+        PowerReading.id <= request.last_reading_id,
+        PowerReading.is_verified == True,
+        PowerReading.is_on_chain == False
+    ).all()
+    
+    if not readings:
+        raise HTTPException(
+            status_code=404, 
+            detail=f"No verified, non-blockchain readings found in range {request.first_reading_id}-{request.last_reading_id}"
+        )
+    
+    # Update all readings in the range
+    updated_count = 0
+    updated_ids = []
+    for reading in readings:
+        reading.is_on_chain = True
+        reading.blockchain_tx_hash = request.blockchain_tx_hash
+        if request.blockchain_block_number:
+            reading.blockchain_block_number = request.blockchain_block_number
+        updated_count += 1
+        updated_ids.append(reading.id)
+    
+    try:
+        db.commit()
+        return {
+            "message": f"Successfully marked {updated_count} readings as on-chain",
+            "range": f"{request.first_reading_id}-{request.last_reading_id}",
+            "updated_reading_ids": updated_ids,
+            "blockchain_tx_hash": request.blockchain_tx_hash,
+            "blockchain_block_number": request.blockchain_block_number
+        }
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+
 @router.get("/readings/{installation_id}", response_model=List[PowerReadingResponse])
 def get_power_readings(
     installation_id: int,

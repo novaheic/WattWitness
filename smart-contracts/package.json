@@ -1,0 +1,8 @@
+{
+  "dependencies": {
+    "@chainlink/env-enc": "^1.0.5",
+    "@chainlink/functions-toolkit": "^0.3.2",
+    "dotenv": "^16.6.0",
+    "ethers": "^5.8.0"
+  }
+}
