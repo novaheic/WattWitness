@@ -30,7 +30,7 @@ Before you begin, ensure you have:
 cd smart-contracts
 ```
 
-2. Create a `.env` file with your configuration:
+2. Create a `.env` file with your configuration:. Use `.env.example` as a template.
 ```bash
 # Required variables
 DEPLOYER_PRIVATE_KEY=0x1234567890abcdef...  # Your private key (never share!)
@@ -63,14 +63,20 @@ After deployment, you need to add your contract as a consumer to your Chainlink 
 3. Enter your deployed contract address
 4. Confirm the transaction
 
-### Step 4: Test Manual Request
+### Step 4: Chainlink Automation
 
-Once the consumer is added, test the system:
-```bash
-./trigger-wattwitness-request.sh
-```
+For automatic data fetching, set up Chainlink Automation:
 
-This will send a manual request and show you how to monitor the results.
+1. Go to https://automation.chain.link/avalanche-fuji
+2. Click "Register new upkeep"
+3. Choose "Custom logic" upkeep
+4. Enter your contract address
+5. Set upkeep name: "WattWitness Data Fetcher"
+6. Set gas limit: 2,000,000
+7. Set starting balance: 5 LINK
+8. Set interval: 300 seconds (5 minutes)
+9. Complete registration and fund the upkeep
+
 
 ## 🔧 Configuration
 
@@ -122,20 +128,6 @@ cast call $WATTWITNESS_CONTRACT_ADDRESS "getLatestResponse()" --rpc-url $AVALANC
 cast call $WATTWITNESS_CONTRACT_ADDRESS "getLatestBatchInfo()" --rpc-url $AVALANCHE_FUJI_RPC
 ```
 
-## 🤖 Chainlink Automation
-
-For automatic data fetching, set up Chainlink Automation:
-
-1. Go to https://automation.chain.link/avalanche-fuji
-2. Click "Register new upkeep"
-3. Choose "Custom logic" upkeep
-4. Enter your contract address
-5. Set upkeep name: "WattWitness Data Fetcher"
-6. Set gas limit: 2,000,000
-7. Set starting balance: 7 LINK
-8. Set interval: 300 seconds (5 minutes)
-9. Complete registration and fund the upkeep
-
 ## 🏗️ Architecture
 
 ### Smart Contract Structure
@@ -182,17 +174,6 @@ forge build
 forge test
 ```
 
-### Local Development
-
-For local testing with Anvil:
-```bash
-# Start local blockchain
-anvil
-
-# Deploy to local (in another terminal)
-forge script script/DeployWattWitnessDataLogger.s.sol:DeployCompressedWattWitness --rpc-url http://localhost:8545 --broadcast
-```
-
 ## 🔍 Troubleshooting
 
 ### Common Issues
@@ -211,19 +192,3 @@ forge script script/DeployWattWitnessDataLogger.s.sol:DeployCompressedWattWitnes
 - System automatically falls back to mock data
 - Check WattWitness API status
 - Verify internet connectivity
-
-### Useful Commands
-
-```bash
-# Check AVAX balance
-cast balance $DEPLOYER_ADDRESS --rpc-url $AVALANCHE_FUJI_RPC
-
-# Check LINK balance (subscription)
-# Visit: https://functions.chain.link/avalanche-fuji/[SUBSCRIPTION_ID]
-
-# View contract on Snowtrace
-# https://testnet.snowtrace.io/address/[CONTRACT_ADDRESS]
-
-# Manual contract call
-cast send $WATTWITNESS_CONTRACT_ADDRESS "requestWattWitnessData()" --private-key $DEPLOYER_PRIVATE_KEY --rpc-url $AVALANCHE_FUJI_RPC
-```

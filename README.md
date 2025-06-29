@@ -1,26 +1,35 @@
 # WattWitness
 
-A Trustless Tamperproof Electricity Production Meter system for solar park tokenization. Ensures verifiable and immutable power production data through secure hardware measurements and blockchain integration.
+A Trustless Tamperproof Electricity Production Meter system for solar park tokenization. Ensures verifiable and immutable power production data through secure hardware measurements and integration of blockchain technology with Chainlink.
 
 ## 🎯 Key Features
 
-### ✅ **Real-Time Dashboard**
+### **Real-Time Dashboard**
 - **Live Power Output:** Current power production with real-time updates
 - **Energy Charts:** Interactive charts showing production over Hour, Day, Week, Month, Year
 - **System Status:** Live monitoring of internet connectivity and ESP32 status
 - **Latest Records:** Recent power readings with timestamps
 - **General Info:** Device information and uptime tracking
 
-### ✅ **Data Management**
+### **Data Management**
 - **Automatic Aggregation:** Smart data grouping for different time frames
 - **Energy Calculations:** Accurate power-based energy production calculations
 - **Lifetime Tracking:** Production tracking since system initialization
 - **Local Time Support:** Proper timezone handling for global deployments
 
-### ✅ **System Monitoring**
+### **System Monitoring**
 - **Internet Connectivity:** Real-time internet status with robust error handling
 - **ESP32 Liveliness:** Automatic detection of ESP32 connection status
 - **Overall System Health:** Combined status indicators for system health
+
+### **Chainlink Integration**
+- **Chainlink Automation:** Automatic and reoccuring calling of our function to process readings
+- **Chainlink Functions:** Calls our API for readings and stores them on chain
+
+## Deployed Contracts
+
+### Avalanche Fuji Testnet
+WattWitnessDataLogger: 0x7189D2b09691a8867056a228fb3e227e12E5B105
 
 ## 📡 API Access
 
@@ -114,17 +123,17 @@ wattwitness/
 │   │   │   ├── db/        # Database models
 │   │   │   └── core/      # Core functionality
 │   │   └── main.py        # Application entry
-│   └── frontend/          # Dashboard (React + TypeScript)
-│       ├── src/
-│       │   ├── components/ # Dashboard components
-│       │   ├── hooks/      # React Query hooks
-│       │   └── services/   # API integration
-│       └── public/
-├── smart-contracts/          # Blockchain integration
-│   ├── chainlink-functions / # Chainlink Functions
-│   ├── src/                  # Solidity contracts
-│   └── scripts/              # Deployment scripts
-├── docs/               # Documentation
+│   ├── frontend/          # Dashboard (React + TypeScript)
+│   │   ├── src/
+│   │   │   ├── components/ # Dashboard components
+│   │   │   ├── hooks/      # React Query hooks
+│   │   │   └── services/   # API integration
+│   │   └── public/
+│   └─── listener/          # Program that listens for onchain processing
+└── smart-contracts/          # Blockchain integration
+    ├── chainlink-functions / # Chainlink Functions
+    ├── src/                  # Solidity contracts
+    └── script/               # Deployment & Testing scripts
 ```
 
 ## 🔐 Security Features
@@ -169,6 +178,12 @@ wattwitness/
 4. Build frontend: `npm run build`
 5. Serve with nginx or static server
 6. Flash ESP32 and power independently
+
+### Smart Contract Deployment
+1. Setup /smart-contracts/.env
+2. Deploy and verify the contracts with `deploy-wattwitness.sh`
+3. Add the deployed contract as a consumer of a Chainlink Functions subscription
+4. Setup the contract to fire every 5 minutes with Chainlink Automation
 
 ## 📊 Data Flow
 
