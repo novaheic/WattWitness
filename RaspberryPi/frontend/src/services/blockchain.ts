@@ -57,7 +57,7 @@ interface CacheEntry<T> {
 class BlockchainService {
   private provider!: ethers.providers.JsonRpcProvider;
   private contract!: ethers.Contract;
-  private _eventListeners: Map<string, any> = new Map();
+
   private currentRPCIndex: number = 0; // Start with Infura
   private cachedDeviceInfo: any = null; // Cache device info to avoid repeated API calls
   
