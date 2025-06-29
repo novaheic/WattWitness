@@ -1,10 +1,14 @@
 import React from 'react';
 import logo from '../assets/logo.png';
 import { useInternetStatus } from '../hooks/usePowerData';
+import { useBlockchainData } from '../hooks/useBlockchainData';
 
 export const Header: React.FC = () => {
   // Get real internet connectivity status
   const { data: internetConnected = false, isLoading: internetLoading } = useInternetStatus();
+  
+  // Get blockchain data for refresh functionality
+  const { refetch: refetchBlockchainData } = useBlockchainData();
 
   return (
     <header className="w-full pt-8">
@@ -33,6 +37,8 @@ export const Header: React.FC = () => {
               className="p-2 rounded-full bg-white hover:bg-[#E9EBEB] transition-colors group"
               style={{ outline: 'none', border: 'none' }}
               onFocus={(e) => e.target.style.outline = 'none'}
+              onClick={refetchBlockchainData}
+              title="Refresh blockchain data"
             >
               <svg className="h-5 w-5 text-gray-500 group-hover:text-gray-900" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />

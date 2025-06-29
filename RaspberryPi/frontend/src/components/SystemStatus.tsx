@@ -1,5 +1,5 @@
 import React from 'react';
-import { useInternetStatus, useESP32Status, useInstallation } from '../hooks/usePowerData';
+import { useInternetStatus, useESP32Status, useInstallation, useBlockchainStatus } from '../hooks/usePowerData';
 
 export const SystemStatus: React.FC = () => {
   // Get installation for ESP32 status check
@@ -8,9 +8,7 @@ export const SystemStatus: React.FC = () => {
   // Get real status values
   const { data: internetConnected = false, isLoading: internetLoading } = useInternetStatus();
   const { data: energyMeterLive = false, isLoading: esp32Loading } = useESP32Status(installation?.id);
-  
-  // Blockchain status - placeholder for now
-  const blockchainUpToDate = true; // TODO: Implement blockchain status check
+  const { data: blockchainUpToDate = false, isLoading: blockchainLoading } = useBlockchainStatus();
   
   // Calculate overall status
   const operationalCount = [internetConnected, blockchainUpToDate, energyMeterLive]
@@ -81,8 +79,8 @@ export const SystemStatus: React.FC = () => {
               </span>
             </div>
             <div className="flex items-center gap-3">
-              <CheckIcon isActive={blockchainUpToDate} />
-              <span className={`text-gray-600 text-sm ${!blockchainUpToDate && 'text-red-500'}`}>
+              <CheckIcon isActive={blockchainUpToDate} isLoading={blockchainLoading} />
+              <span className={`text-gray-600 text-sm ${!blockchainUpToDate && !blockchainLoading && 'text-red-500'}`}>
                 Blockchain Up To Date
               </span>
             </div>

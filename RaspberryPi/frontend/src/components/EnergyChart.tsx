@@ -105,38 +105,121 @@ export const EnergyChart: React.FC = () => {
     selectedTimeFrame.name
   );
 
-  // Transform chart data for Recharts
-  const chartDataForRecharts = (chartData?.data_points || []).map(point => {
-    // Convert UTC timestamp to local time string for the X-axis label
-    const date = new Date(point.timestamp * 1000);
-    let localLabel = '';
-    switch (selectedTimeFrame.name.toLowerCase()) {
-      case 'hour':
-        localLabel = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        break;
-      case 'day':
-        localLabel = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        break;
-      case 'week':
-        localLabel = date.toLocaleDateString([], { weekday: 'short' });
-        break;
-      case 'month':
-        localLabel = date.toLocaleDateString([], { month: 'short', day: '2-digit' });
-        break;
-      case 'year':
-        localLabel = date.toLocaleDateString([], { month: 'short' });
-        break;
-      default:
-        localLabel = point.label;
+  // Debug: Log the raw chart data we receive from backend
+  useEffect(() => {
+    if (chartData && selectedTimeFrame.name.toLowerCase() === 'week') {
+      console.log('🔍 RAW BACKEND WEEK DATA:', chartData);
+      console.log('📊 Raw data points:', chartData.data_points?.map(p => ({
+        label: p.label,
+        timestamp: p.timestamp,
+        localTime: new Date(p.timestamp * 1000).toLocaleString(),
+        localDate: new Date(p.timestamp * 1000).toLocaleDateString('en-CA'),
+        localDay: new Date(p.timestamp * 1000).toLocaleDateString([], { weekday: 'short' }),
+        value: p.value
+      })));
     }
-    return {
-      day: localLabel,
-      value: point.value,
-      rawLabel: point.label,
-      timestamp: point.timestamp,
-      chartData: chartData?.data_points || [] // Include full chart data for tooltip scaling
-    };
-  });
+  }, [chartData, selectedTimeFrame.name]);
+
+  // Transform and regroup chart data for local timezone (week/month only)
+  const regroupByLocalTime = (dataPoints: any[], timeFrame: string) => {
+    // For hour/day/year, backend grouping works fine - just update labels
+    if (!['week', 'month'].includes(timeFrame.toLowerCase())) {
+      return dataPoints.map(point => {
+        const date = new Date(point.timestamp * 1000);
+        let localLabel = '';
+        switch (timeFrame.toLowerCase()) {
+          case 'hour':
+            localLabel = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            break;
+          case 'day':
+            localLabel = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            break;
+          case 'year':
+            localLabel = date.toLocaleDateString([], { month: 'short' });
+            break;
+          default:
+            localLabel = point.label;
+        }
+        return {
+          day: localLabel,
+          value: point.value,
+          rawLabel: point.label,
+          timestamp: point.timestamp,
+          chartData: dataPoints
+        };
+      });
+    }
+
+    // For week/month, regroup by LOCAL timezone to fix UTC day grouping issue
+    console.log(`🌍 Regrouping ${timeFrame} data by local timezone (fixing UTC day grouping)`);
+    const groupedByLocalTime = new Map<string, { 
+      value: number, 
+      timestamp: number, 
+      localLabel: string,
+      count: number 
+    }>();
+    
+    dataPoints.forEach(point => {
+      const date = new Date(point.timestamp * 1000);
+      let groupKey = '';
+      let localLabel = '';
+      
+      if (timeFrame.toLowerCase() === 'week') {
+        // Group by local date (YYYY-MM-DD format for consistent grouping)
+        groupKey = date.toLocaleDateString('en-CA'); // ISO format: YYYY-MM-DD
+        localLabel = date.toLocaleDateString([], { weekday: 'short' }); // Mon, Tue, etc.
+      } else if (timeFrame.toLowerCase() === 'month') {
+        // Group by local date for month view
+        groupKey = date.toLocaleDateString('en-CA'); // ISO format: YYYY-MM-DD 
+        localLabel = date.toLocaleDateString([], { month: 'short', day: '2-digit' }); // Jan 15, etc.
+      }
+      
+      if (groupedByLocalTime.has(groupKey)) {
+        // Combine energy from multiple UTC buckets that fall on same local day
+        const existing = groupedByLocalTime.get(groupKey)!;
+        existing.value += point.value;
+        existing.count += 1;
+        console.log(`📅 Combined ${timeFrame} data: ${groupKey} (${localLabel}) now has ${existing.value.toFixed(2)}Wh from ${existing.count} UTC buckets`);
+      } else {
+        // Create new local day group
+        groupedByLocalTime.set(groupKey, {
+          value: point.value,
+          timestamp: point.timestamp,
+          localLabel: localLabel,
+          count: 1
+        });
+        console.log(`📅 New ${timeFrame} group: ${groupKey} (${localLabel}) = ${point.value.toFixed(2)}Wh`);
+      }
+    });
+    
+    // Convert back to array, sort by timestamp, and format for chart
+    const regroupedData = Array.from(groupedByLocalTime.values())
+      .sort((a, b) => a.timestamp - b.timestamp)
+      .map(group => ({
+        day: group.localLabel,
+        value: group.value,
+        rawLabel: group.localLabel,
+        timestamp: group.timestamp,
+        chartData: dataPoints // Include original data for tooltip scaling
+      }));
+    
+    console.log(`🔄 Regrouped ${dataPoints.length} UTC ${timeFrame} buckets → ${regroupedData.length} local ${timeFrame} buckets`);
+    return regroupedData;
+  };
+
+  // Apply the regrouping logic
+  const chartDataForRecharts = regroupByLocalTime(
+    chartData?.data_points || [], 
+    selectedTimeFrame.name
+  );
+
+  // Debug: Log the final chart data
+  useEffect(() => {
+    if (chartDataForRecharts.length > 0 && selectedTimeFrame.name.toLowerCase() === 'week') {
+      console.log('📈 FINAL CHART DATA FOR WEEK:', chartDataForRecharts);
+      console.log('📅 Final chart labels:', chartDataForRecharts.map(d => d.day));
+    }
+  }, [chartDataForRecharts, selectedTimeFrame.name]);
 
   // Update chart width on mount and resize
   useEffect(() => {

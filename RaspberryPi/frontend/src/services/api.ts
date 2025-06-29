@@ -81,6 +81,60 @@ export const api = {
     return response.data;
   },
 
+  // Get readings that haven't been submitted to blockchain yet (for pending transaction)
+  async getUnprocessedReadings(installationId: number): Promise<PowerReading[]> {
+    const params = new URLSearchParams();
+    params.append('verified_only', 'true');
+    params.append('on_chain_only', 'false'); // Get readings not yet on chain
+    
+    const response = await apiClient.get(`/api/v1/readings/${installationId}?${params}`);
+    // Filter to only readings that aren't on chain yet
+    return response.data.filter((reading: PowerReading) => !reading.is_on_chain);
+  },
+
+  // Get ONLY the most recent unprocessed readings (for pending transaction calculation)
+  async getRecentUnprocessedReadings(installationId: number, limit: number = 15): Promise<PowerReading[]> {
+    console.log(`🔍 Fetching readings from the last 3 minutes only`);
+    
+    // Get readings only from the last 3 minutes to ensure we get the truly recent ones
+    const endTime = new Date();
+    const startTime = new Date(endTime.getTime() - 3 * 60 * 1000); // 3 minutes ago
+    
+    const params = new URLSearchParams();
+    params.append('verified_only', 'true');
+    params.append('on_chain_only', 'false'); // Get readings not yet on chain
+    params.append('start_time', startTime.toISOString());
+    params.append('end_time', endTime.toISOString());
+    
+    console.log(`🔍 Fetching readings between:`, {
+      startTime: startTime.toISOString(),
+      endTime: endTime.toISOString()
+    });
+    
+    const response = await apiClient.get(`/api/v1/readings/${installationId}?${params}`);
+    
+    // Filter to only readings that aren't on chain yet
+    const unprocessedReadings = response.data.filter((reading: PowerReading) => !reading.is_on_chain);
+    
+    // Sort by timestamp descending (most recent first) and take only the limit
+    const recentReadings = unprocessedReadings
+      .sort((a: PowerReading, b: PowerReading) => b.timestamp - a.timestamp)
+      .slice(0, limit);
+    
+    console.log(`🔍 Got ${recentReadings.length} readings from last 3 minutes:`, {
+      totalUnprocessed: unprocessedReadings.length,
+      takingMostRecent: recentReadings.length,
+      timeSpan: recentReadings.length > 1 ? 
+        `${((recentReadings[0].timestamp - recentReadings[recentReadings.length - 1].timestamp) / 60).toFixed(1)} minutes` : 'N/A',
+      firstTotalWh: recentReadings[0]?.total_wh,
+      lastTotalWh: recentReadings[recentReadings.length - 1]?.total_wh,
+      energyDiff: recentReadings.length > 1 ? 
+        (recentReadings[0].total_wh - recentReadings[recentReadings.length - 1].total_wh) : 0
+    });
+    
+    return recentReadings;
+  },
+
   // Get optimized power readings using backend aggregation and smart sampling
   async getSampledReadings(
     installationId: number,

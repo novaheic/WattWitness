@@ -1,6 +1,8 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef } from 'react';
 import { api, PowerReading } from '../services/api';
+import { useBlockchainData } from './useBlockchainData';
+import { blockchainService } from '../services/blockchain';
 
 // Hook to get the first available installation ID
 export const useInstallation = () => {
@@ -188,6 +190,42 @@ export const useESP32Status = (installationId: number | undefined) => {
     enabled: !!installationId,
     staleTime: 0, // Always check
     refetchInterval: 10000, // Check every 10 seconds
+    refetchIntervalInBackground: false,
+  });
+};
+
+// Hook to check if blockchain is up to date (has records within last 20 minutes)
+// Uses cached blockchain service data to avoid duplicate requests
+export const useBlockchainStatus = () => {
+  return useQuery({
+    queryKey: ['blockchain-status'],
+    queryFn: async () => {
+      try {
+        // Use cached blockchain service data to avoid duplicate API calls
+        const records = await blockchainService.getRecentTransactions();
+        
+        if (records.length === 0) {
+          return false;
+        }
+        
+        // Check if the most recent blockchain record is within the last 20 minutes
+        const latestRecord = records[0]; // Records are sorted most recent first
+        if (!latestRecord) return false;
+        
+        // Parse the timestamp from the latest record (format: "2024-01-01 12:00:00 UTC")
+        const recordTime = new Date(latestRecord.timestamp.replace(' UTC', 'Z'));
+        const now = new Date();
+        const timeDiffMinutes = (now.getTime() - recordTime.getTime()) / (1000 * 60);
+        
+        // Consider up to date if latest record is within 20 minutes
+        return timeDiffMinutes <= 20;
+      } catch (error) {
+        console.warn('Blockchain status check failed:', error);
+        return false;
+      }
+    },
+    staleTime: 30000, // Cache for 30 seconds
+    refetchInterval: 60000, // Check every minute (less frequent)
     refetchIntervalInBackground: false,
   });
 };
