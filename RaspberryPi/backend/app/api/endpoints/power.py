@@ -1,13 +1,20 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Optional
 from datetime import datetime, timedelta
 import json
 import base64
+import os
 
 from app.db.database import get_db
-from app.db.models import PowerReading, SolarInstallation, PowerReadingAggregate
+from app.db.models import PowerReading, SolarInstallation
 from pydantic import BaseModel
+
+# Blockchain factory helper (lazy import to avoid circular deps during tests)
+try:
+    from app.blockchain.factory_client import deploy_logger_for_installation  # noqa: E402
+except Exception:
+    deploy_logger_for_installation = None  # type: ignore
 
 router = APIRouter()
 
@@ -26,6 +33,8 @@ class InstallationResponse(BaseModel):
     last_boot_timestamp: int | None
     created_at: datetime
     is_active: bool
+    logger_contract_address: str | None = None
+    deployment_tx_hash: str | None = None
 
     class Config:
         orm_mode = True
@@ -95,7 +104,9 @@ def get_installations(db: Session = Depends(get_db)):
             public_key=installation.public_key,
             last_boot_timestamp=installation.last_boot_timestamp,
             created_at=installation.created_at,
-            is_active=installation.is_active
+            is_active=installation.is_active,
+            logger_contract_address=installation.logger_contract_address,
+            deployment_tx_hash=installation.deployment_tx_hash
         )
         for installation in installations
     ]
@@ -136,7 +147,9 @@ def create_installation(installation: InstallationCreate, db: Session = Depends(
             "public_key": existing.public_key,
             "last_boot_timestamp": existing.last_boot_timestamp,
             "created_at": existing.created_at,
-            "is_active": existing.is_active
+            "is_active": existing.is_active,
+            "logger_contract_address": existing.logger_contract_address,
+            "deployment_tx_hash": existing.deployment_tx_hash
         }
     
     # Create new installation
@@ -148,9 +161,34 @@ def create_installation(installation: InstallationCreate, db: Session = Depends(
     )
     
     try:
+        # Persist preliminarily to obtain ID (but keep in transaction)
         db.add(db_installation)
+        db.flush()  # Get auto-generated ID without committing
+
+        # ===== Deploy on-chain logger via factory if helper available =====
+        logger_addr: Optional[str] = None
+        deploy_tx: Optional[str] = None
+        if deploy_logger_for_installation:
+            try:
+                if os.getenv("DISABLE_FACTORY", "0") == "1":
+                    raise RuntimeError("Factory disabled via env")
+                logger_addr, deploy_tx = deploy_logger_for_installation(
+                    installation_id=db_installation.id,
+                    name=db_installation.name,
+                    shelly_mac=db_installation.shelly_mac,
+                    public_key=db_installation.public_key,
+                    created_at=int(db_installation.created_at.timestamp()),
+                    is_active=db_installation.is_active,
+                )
+                db_installation.logger_contract_address = logger_addr
+                db_installation.deployment_tx_hash = deploy_tx
+            except Exception as e:
+                print(f"Factory deployment failed: {e}")
+                # Decide whether to abort or continue; for now, continue without rollback
+
         db.commit()
         db.refresh(db_installation)
+        print(f"Successfully created installation: {db_installation.id}")
         return {
             "id": db_installation.id,
             "name": db_installation.name,
@@ -158,7 +196,9 @@ def create_installation(installation: InstallationCreate, db: Session = Depends(
             "public_key": db_installation.public_key,
             "last_boot_timestamp": db_installation.last_boot_timestamp,
             "created_at": db_installation.created_at,
-            "is_active": db_installation.is_active
+            "is_active": db_installation.is_active,
+            "logger_contract_address": db_installation.logger_contract_address,
+            "deployment_tx_hash": db_installation.deployment_tx_hash
         }
     except Exception as e:
         db.rollback()

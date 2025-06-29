@@ -13,6 +13,8 @@ class SolarInstallation(Base):
     shelly_mac = Column(String, unique=True)  # MAC address from ShellyEM
     public_key = Column(String, unique=True)  # Public key from ESP32
     last_boot_timestamp = Column(BigInteger)  # Unix timestamp of last ESP32 boot/reset
+    logger_contract_address = Column(String, unique=True)  # Deployed on-chain logger contract
+    deployment_tx_hash = Column(String, unique=True)  # Transaction hash of deployment
     created_at = Column(DateTime, default=datetime.utcnow)
     is_active = Column(Boolean, default=True)
     
