@@ -47,7 +47,7 @@ const confirmedRecords: ConfirmedRecord[] = [
       { timestamp: '2025-06-28 12:42:46', power: 132.4, totalKwh: 34325030, signature: '854314...000000' },
       { timestamp: '2025-06-28 12:42:46', power: 132.4, totalKwh: 34325030, signature: '854314...000000' },
       // Adding more readings to reach 31 total
-      ...Array(22).fill(null).map((_, i) => ({
+      ...Array(22).fill(null).map(() => ({
         timestamp: '2025-06-28 12:42:46',
         power: 132.4,
         totalKwh: 34325030,
