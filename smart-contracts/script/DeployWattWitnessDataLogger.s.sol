@@ -28,7 +28,15 @@ contract DeployCompressedWattWitness is Script {
         vm.startBroadcast(deployerPrivateKey);
 
         // Deploy compressed client
-        WattWitnessDataLogger compressedClient = new WattWitnessDataLogger(config.router);
+        WattWitnessDataLogger compressedClient = new WattWitnessDataLogger(
+            config.router,
+            1, // installationId – update via env var if needed
+            "Demo Installation", // installationName
+            "FFFFFFFFFFFF", // shellyMac
+            "", // esp32PublicKey
+            block.timestamp,
+            true
+        );
         
         console2.log("WattWitnessDataLogger deployed at:", address(compressedClient));
 

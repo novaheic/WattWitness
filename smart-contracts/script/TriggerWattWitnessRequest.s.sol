@@ -10,7 +10,7 @@ interface ICompressedClient {
 /**
  * @title TriggerCompressedRequest
  * @notice One-off helper script: sends a requestWattWitnessData() tx from DEPLOYER_PRIVATE_KEY
- *         to the deployed AutomatedWattWitnessCompressed contract (address read from COMPRESSED_CLIENT env var).
+ *         to the deployed WattWitnessDataLogger contract (address read from COMPRESSED_CLIENT env var).
  *         Usage:
  *           export DEPLOYER_PRIVATE_KEY=<hex>
  *           export COMPRESSED_CLIENT=0x...

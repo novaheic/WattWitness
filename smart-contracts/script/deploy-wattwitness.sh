@@ -96,7 +96,7 @@ DEPLOY_OUTPUT=$(forge script "$SCRIPT_PATH" \
 echo "$DEPLOY_OUTPUT"
 
 # Extract contract address from output
-CONTRACT_ADDRESS=$(echo "$DEPLOY_OUTPUT" | grep -E "(Contract Address:|WattWitnessDataLogger deployed at:)" | grep -oE "0x[a-fA-F0-9]{40}" | tail -1)
+CONTRACT_ADDRESS=$(echo "$DEPLOY_OUTPUT" | grep -E "Contract Address:" | grep -oE "0x[a-fA-F0-9]{40}" | tail -1)
 
 if [ -z "$CONTRACT_ADDRESS" ]; then
   echo "❌ Unable to parse contract address from deployment output" >&2
