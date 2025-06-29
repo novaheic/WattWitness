@@ -1,0 +1,339 @@
+// SPDX-License-Identifier: MIT
+pragma solidity 0.8.19;
+
+import {FunctionsClient} from "@chainlink/contracts/src/v0.8/functions/v1_0_0/FunctionsClient.sol";
+import {ConfirmedOwner} from "@chainlink/contracts/src/v0.8/shared/access/ConfirmedOwner.sol";
+import {FunctionsRequest} from "@chainlink/contracts/src/v0.8/functions/v1_0_0/libraries/FunctionsRequest.sol";
+
+/**
+ * @title WattWitnessDataLogger
+ * @author Tranquil-Flow
+ * @notice This contract fetches and stores power readings from WattWitness API using Chainlink Functions
+ */
+contract WattWitnessDataLogger is FunctionsClient, ConfirmedOwner {
+    using FunctionsRequest for FunctionsRequest.Request;
+
+    // ========== STATE VARIABLES ==========
+    bytes32 public latestRequestId;
+    bytes public latestResponse;
+    bytes public latestError;
+    bytes32 public latestMerkleRoot;
+    uint32 public totalReadingsProcessed;
+    uint256 public totalBatchesProcessed;
+
+    // Chainlink configurations
+    uint64 public subscriptionId;
+    uint32 public gasLimit;
+    bytes32 public donId;
+    string public source;
+    bytes public encryptedSecretsUrls;
+    uint8 public donHostedSecretsSlotId;
+    uint64 public donHostedSecretsVersion;
+
+    // Default maximum readings per compressed batch
+    uint16 public maxBatchSize = 20;
+
+    // Compressed batch metadata structure
+    struct BatchMetadata {
+        uint32 firstReadingId;
+        uint16 readingCount;
+        uint16 timeInterval;
+        uint32 basePower;
+        uint32 baseEnergy;
+    }
+
+    // ========== EVENTS ==========
+    event ResponseReceived(bytes32 indexed requestId, bytes response, bytes err);
+
+    event BatchProcessed(
+        bytes32 indexed requestId,
+        bytes32 indexed merkleRoot,
+        uint32 indexed firstReadingId,
+        uint16 readingCount,
+        uint256 gasUsed
+    );
+
+    event PowerReading (
+        uint32 indexed readingId,
+        uint32 indexed timestamp,
+        uint32 powerW,
+        uint32 totalWh
+    );
+
+    constructor(address router) FunctionsClient(router) ConfirmedOwner(msg.sender) {}
+
+    // ========== CHAINLINK FUNCTIONS ==========
+    /**
+     * @notice Send request for compressed WattWitness data
+     */
+    function requestWattWitnessData() external returns (bytes32 requestId) {
+        FunctionsRequest.Request memory req;
+        req.initializeRequestForInlineJavaScript(source);
+        
+        if (encryptedSecretsUrls.length > 0) {
+            req.addSecretsReference(encryptedSecretsUrls);
+        } else if (donHostedSecretsVersion > 0) {
+            req.addDONHostedSecrets(donHostedSecretsSlotId, donHostedSecretsVersion);
+        }
+
+        requestId = _sendRequest(req.encodeCBOR(), subscriptionId, gasLimit, donId);
+        latestRequestId = requestId;
+        
+        return requestId;
+    }
+
+    /**
+     * @notice Chainlink Functions callback - decompresses batch and emits events for all readings
+     * @param requestId The request ID
+     * @param response 256-byte compressed response
+     * @param err Error message if any
+     */
+    function fulfillRequest(bytes32 requestId, bytes memory response, bytes memory err) internal override {
+        uint256 gasStart = gasleft();
+        
+        latestResponse = response;
+        latestError = err;
+        
+        emit ResponseReceived(requestId, response, err);
+
+        if (err.length > 0) {
+            return; // Exit on error
+        }
+
+        if (response.length != 256) {
+            return; // Invalid response size
+        }
+
+        // Decompress the batch and emit events
+        _decompressAndEmitBatchInline(requestId, response);
+
+        uint256 gasUsed = gasStart - gasleft();
+        
+        // Update global counters
+        totalBatchesProcessed++;
+    }
+
+
+    // ========== EXTERNAL FUNCTIONS ==========
+    /**
+     * @notice Configure Chainlink Functions parameters
+     */
+    function configure(
+        uint64 _subscriptionId,
+        uint32 _gasLimit,
+        bytes32 _donId,
+        string calldata _source
+    ) external onlyOwner {
+        subscriptionId = _subscriptionId;
+        gasLimit = _gasLimit;
+        donId = _donId;
+        source = _source;
+    }
+
+    /**
+     * @notice Set maximum number of readings to incdlue per batch
+     */
+    function setMaxBatchSize(uint16 _maxBatchSize) external onlyOwner {
+        maxBatchSize = _maxBatchSize;
+    }
+
+
+    /**
+     * @notice Verify a reading using merkle proof
+     * @param readingId The reading ID to verify
+     * @param powerW Power value in watts
+     * @param totalWh Total energy in watt-hours
+     * @param timestamp Reading timestamp
+     * @param merkleRoot The merkle root to verify against
+     * @param proof Merkle proof array
+     * @return True if the reading is valid
+     */
+    function verifyReading(
+        uint32 readingId,
+        uint32 powerW,
+        uint32 totalWh,
+        uint32 timestamp,
+        bytes32 merkleRoot,
+        bytes32[] calldata proof
+    ) external pure returns (bool) {
+        // Create leaf hash for the reading
+        bytes32 leaf = keccak256(abi.encodePacked(
+            "[", readingId, ",", powerW, ",", totalWh, ",", timestamp, "]"
+        ));
+        
+        return verifyMerkleProof(proof, merkleRoot, leaf);
+    }
+
+    // View functions
+    function getLatestBatchInfo() external view returns (
+        bytes32 requestId,
+        bytes32 merkleRoot,
+        uint32 totalReadings,
+        uint256 totalBatches,
+        uint256 responseLength
+    ) {
+        return (
+            latestRequestId,
+            latestMerkleRoot,
+            totalReadingsProcessed,
+            totalBatchesProcessed,
+            latestResponse.length
+        );
+    }
+
+    /**
+     * @notice Public wrapper retained for compatibility with tests/other callers
+     */
+    function decompressAndEmitBatch(bytes32 requestId, bytes calldata response) external {
+        _decompressAndEmitBatchInline(requestId, bytes(response));
+    }
+
+    // ========== INTERNAL FUNCTIONS ==========
+
+    /**
+     * @dev Internalised version of decompression loop to avoid external CALL overhead
+     */
+    function _decompressAndEmitBatchInline(bytes32 requestId, bytes memory response) internal {
+        require(response.length == 256, "Invalid response length");
+
+        // Extract merkle root (bytes 0-31)
+        bytes32 merkleRoot;
+        assembly {
+            merkleRoot := mload(add(response, 32))
+        }
+        
+        latestMerkleRoot = merkleRoot;
+
+        // Extract metadata (bytes 32-47)
+        BatchMetadata memory meta = extractMetadata(response);
+        
+        require(meta.readingCount <= maxBatchSize, "Batch size exceeds limit");
+        require(meta.readingCount > 0, "Empty batch");
+
+        // Decompress readings and emit events (bytes 48+)
+        uint256 offset = 48;
+        int32 cumulativePowerDelta = 0;
+        uint32 currentEnergy = meta.baseEnergy;
+
+        uint16 timeInterval = meta.timeInterval;
+        uint32 basePower = meta.basePower;
+        uint32 firstReadingId = meta.firstReadingId;
+
+        for (uint16 i = 0; i < meta.readingCount; ) {
+            // Extract power delta (1 byte, signed)
+            int8 powerDelta = int8(uint8(response[offset]));
+            offset++;
+            
+            // Extract energy delta (2 bytes, big-endian, unsigned)
+            uint16 energyDelta = (uint16(uint8(response[offset])) << 8) | uint16(uint8(response[offset + 1]));
+            offset += 2;
+
+            // Update cumulative power delta (signed) and energy; bounds guaranteed by data format
+            unchecked {
+                cumulativePowerDelta += int32(powerDelta);
+                currentEnergy += energyDelta;
+            }
+
+            // Compute actual power; clamp to zero if negative (rare early-morning readings)
+            int32 powerSigned = int32(int32(basePower)) + cumulativePowerDelta;
+            uint32 actualPower = powerSigned >= 0 ? uint32(uint32(powerSigned)) : 0;
+
+            // Emit individual reading event via helper to keep stack depth in check
+            uint32 id = firstReadingId + i;
+            uint32 ts = uint32(block.timestamp) + uint32(timeInterval) * uint32(i);
+
+            _emitReading(id, actualPower, currentEnergy, ts);
+
+            // Increment rolling counters (unchecked – controlled values)
+            unchecked {
+                ++i;
+            }
+        }
+
+        // Update counters
+        totalReadingsProcessed += meta.readingCount;
+
+        // Emit batch summary event
+        emit BatchProcessed(
+            requestId,
+            merkleRoot,
+            firstReadingId,
+            meta.readingCount,
+            0 // Gas calculation handled in fulfillRequest
+        );
+    }
+
+    /**
+     * @notice Extract metadata from compressed response
+     * @param response 256-byte compressed response
+     * @return meta Decoded batch metadata
+     */
+    function extractMetadata(bytes memory response) internal pure returns (BatchMetadata memory meta) {
+        // Metadata starts at offset 32 (after merkle root)
+        uint256 offset = 32;
+        
+        // Extract firstReadingId (4 bytes, big-endian)
+        meta.firstReadingId = uint32(uint8(response[offset])) << 24 |
+                             uint32(uint8(response[offset + 1])) << 16 |
+                             uint32(uint8(response[offset + 2])) << 8 |
+                             uint32(uint8(response[offset + 3]));
+        offset += 4;
+        
+        // Extract readingCount (2 bytes, big-endian)
+        meta.readingCount = uint16(uint8(response[offset])) << 8 | uint16(uint8(response[offset + 1]));
+        offset += 2;
+        
+        // Extract timeInterval (2 bytes, big-endian)
+        meta.timeInterval = uint16(uint8(response[offset])) << 8 | uint16(uint8(response[offset + 1]));
+        offset += 2;
+        
+        // Extract basePower (4 bytes, big-endian)
+        meta.basePower = uint32(uint8(response[offset])) << 24 |
+                        uint32(uint8(response[offset + 1])) << 16 |
+                        uint32(uint8(response[offset + 2])) << 8 |
+                        uint32(uint8(response[offset + 3]));
+        offset += 4;
+        
+        // Extract baseEnergy (4 bytes, big-endian)
+        meta.baseEnergy = uint32(uint8(response[offset])) << 24 |
+                         uint32(uint8(response[offset + 1])) << 16 |
+                         uint32(uint8(response[offset + 2])) << 8 |
+                         uint32(uint8(response[offset + 3]));
+    }
+
+    // Internal helper to emit PowerReading (avoids stack-depth errors)
+    function _emitReading(
+        uint32 id,
+        uint32 power,
+        uint32 energy,
+        uint32 ts
+    ) internal {
+        emit PowerReading(id, ts, power, energy);
+    }
+
+    /**
+     * @notice Verify merkle proof
+     * @param proof Merkle proof array
+     * @param root Merkle root
+     * @param leaf Leaf to verify
+     * @return True if proof is valid
+     */
+    function verifyMerkleProof(
+        bytes32[] memory proof,
+        bytes32 root,
+        bytes32 leaf
+    ) internal pure returns (bool) {
+        bytes32 computedHash = leaf;
+
+        for (uint256 i = 0; i < proof.length; i++) {
+            bytes32 proofElement = proof[i];
+            if (computedHash <= proofElement) {
+                computedHash = keccak256(abi.encodePacked(computedHash, proofElement));
+            } else {
+                computedHash = keccak256(abi.encodePacked(proofElement, computedHash));
+            }
+        }
+
+        return computedHash == root;
+    }
+} 
