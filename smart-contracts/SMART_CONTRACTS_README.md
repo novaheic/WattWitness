@@ -37,7 +37,7 @@ DEPLOYER_PRIVATE_KEY=0x1234567890abcdef...  # Your private key (never share!)
 CHAINLINK_FUNCTIONS_SUBSCRIPTION_ID=123     # Your Chainlink Functions subscription ID
 
 # Optional (defaults provided)
-AVALANCHE_FUJI_RPC=https://api.avax-test.network/ext/bc/C/rpc
+AVALANCHE_FUJI_RPC=https://avalanche-fuji-c-chain-rpc.publicnode.com
 ```
 
 ### Step 2: Deploy the Contract
@@ -76,12 +76,12 @@ This will send a manual request and show you how to monitor the results.
 
 ### Environment Variables
 
-| Variable | Required | Description | Default |
-|----------|----------|-------------|---------|
-| `DEPLOYER_PRIVATE_KEY` | Yes | Your wallet private key | - |
-| `CHAINLINK_FUNCTIONS_SUBSCRIPTION_ID` | Yes | Your Chainlink Functions subscription ID | - |
-| `AVALANCHE_FUJI_RPC` | No | Avalanche Fuji RPC URL | `https://api.avax-test.network/ext/bc/C/rpc` |
-| `WATTWITNESS_CONTRACT_ADDRESS` | Auto | Deployed contract address (auto-saved) | - |
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `DEPLOYER_PRIVATE_KEY` | Your deploying wallet private key | - |
+| `CHAINLINK_FUNCTIONS_SUBSCRIPTION_ID` | Your Chainlink Functions subscription ID | - |
+| `AVALANCHE_FUJI_RPC` | Avalanche Fuji RPC URL | `https://api.avax-test.network/ext/bc/C/rpc` |
+| `WATTWITNESS_API_URL` | Deployed WattWitness API URL (auto-saved) | - |
 
 ### Contract Configuration
 
@@ -122,7 +122,7 @@ cast call $WATTWITNESS_CONTRACT_ADDRESS "getLatestResponse()" --rpc-url $AVALANC
 cast call $WATTWITNESS_CONTRACT_ADDRESS "getLatestBatchInfo()" --rpc-url $AVALANCHE_FUJI_RPC
 ```
 
-## 🤖 Chainlink Automation (Optional)
+## 🤖 Chainlink Automation
 
 For automatic data fetching, set up Chainlink Automation:
 
@@ -131,8 +131,8 @@ For automatic data fetching, set up Chainlink Automation:
 3. Choose "Custom logic" upkeep
 4. Enter your contract address
 5. Set upkeep name: "WattWitness Data Fetcher"
-6. Set gas limit: 500,000
-7. Set starting balance: 5 LINK
+6. Set gas limit: 2,000,000
+7. Set starting balance: 7 LINK
 8. Set interval: 300 seconds (5 minutes)
 9. Complete registration and fund the upkeep
 
@@ -212,13 +212,6 @@ forge script script/DeployWattWitnessDataLogger.s.sol:DeployCompressedWattWitnes
 - Check WattWitness API status
 - Verify internet connectivity
 
-### Getting Help
-
-1. Check contract events on Snowtrace
-2. Review Chainlink Functions documentation
-3. Verify subscription and consumer setup
-4. Check environment variables
-
 ### Useful Commands
 
 ```bash
@@ -234,22 +227,3 @@ cast balance $DEPLOYER_ADDRESS --rpc-url $AVALANCHE_FUJI_RPC
 # Manual contract call
 cast send $WATTWITNESS_CONTRACT_ADDRESS "requestWattWitnessData()" --private-key $DEPLOYER_PRIVATE_KEY --rpc-url $AVALANCHE_FUJI_RPC
 ```
-
-## 📚 Additional Resources
-
-- [Chainlink Functions Documentation](https://docs.chain.link/chainlink-functions)
-- [Avalanche Fuji Testnet](https://docs.avax.network/quickstart/fuji-workflow)
-- [Foundry Documentation](https://book.getfoundry.sh/)
-- [WattWitness API Documentation](https://wattwitness-api.loca.lt/docs)
-
-## 🔐 Security Notes
-
-- Never commit private keys to version control
-- Use environment variables for sensitive data
-- Test on testnets before mainnet deployment
-- Regularly update dependencies
-- Monitor contract events for unexpected behavior
-
-## 📄 License
-
-This project is licensed under the MIT License - see the LICENSE file for details.

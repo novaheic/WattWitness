@@ -2,18 +2,6 @@
 
 A Trustless Tamperproof Electricity Production Meter system for solar park tokenization. Ensures verifiable and immutable power production data through secure hardware measurements and blockchain integration.
 
-## 🚀 Current Status
-
-**✅ FULLY FUNCTIONAL SYSTEM - Complete ESP32 to Dashboard Integration**
-
-The system is currently operational with:
-- ESP32 collecting and signing power data from ShellyEM every 10 seconds
-- FastAPI backend storing verified readings in PostgreSQL
-- Real-time React dashboard with live monitoring
-- System status monitoring (internet connectivity, ESP32 liveliness)
-- Energy production charts with multiple time frames
-- Automatic data aggregation and visualization
-
 ## 🎯 Key Features
 
 ### ✅ **Real-Time Dashboard**
@@ -36,8 +24,8 @@ The system is currently operational with:
 
 ## 📡 API Access
 
-**Backend URL:** `http://localhost:8000` (development) / `http://<pi-ip>:8000` (production)  
-**API Documentation:** `http://localhost:8000/docs`
+**Backend URL:** `http://localhost:8000` (development) / `https://wattwitness-api.loca.lt/` (production)  
+**WattWitnessAPI Documentation:** `https://wattwitness-api.loca.lt/docs`
 
 ### Available Endpoints
 
@@ -47,9 +35,11 @@ The system is currently operational with:
 
 #### Power Readings
 - `POST /api/v1/readings/` - Stores power readings
+- `POST /api/v1/readings/mark-on-chain/` - Updates a reading's info to be marked as stored on chain
 - `GET /api/v1/readings/{installation_id}` - Get readings for installation
 - `GET /api/v1/readings/latest/{installation_id}` - Get latest reading
 - `GET /api/v1/readings/{installation_id}/chart` - Get chart data for time frames
+- `GET /api/v1/readings/pending` - Get all pending readings that have not been stored on chain
 
 #### System Status
 - `GET /health` - System health check
@@ -97,43 +87,6 @@ The system is currently operational with:
 }
 ```
 
-## 🔗 Integration Guide for Teammates
-
-### For Chainlink Integration
-
-**What you need to do:**
-1. **Read from API:** Fetch unprocessed readings (those without `blockchain_tx_hash`)
-2. **Verify signatures:** Use the public key to verify the cryptographic signatures
-3. **Submit to blockchain:** Use Chainlink Functions to write verified data
-4. **Update database:** Mark readings as `is_on_chain: true` with transaction hash
-
-**Key fields for blockchain:**
-- `power_w` (watts)
-- `total_wh` (watt-hours)
-- `timestamp` (Unix timestamp)
-- `signature` (for verification)
-
-### Testing the API
-
-```bash
-# Get latest reading
-curl http://localhost:8000/api/v1/readings/latest/1
-
-# Get chart data for week view
-curl http://localhost:8000/api/v1/readings/1/chart?time_frame=week
-
-# Get all readings
-curl http://localhost:8000/api/v1/readings/1
-```
-
-### Current System Status
-- ✅ ESP32 sending data every 10 seconds
-- ✅ Backend storing readings in PostgreSQL
-- ✅ Real-time dashboard with live updates
-- ✅ System monitoring and status indicators
-- ✅ Energy charts with multiple time frames
-- 🔄 **Next:** Chainlink Functions integration
-
 ## 🏗️ System Architecture
 
 ### Hardware Components
@@ -167,10 +120,11 @@ wattwitness/
 │       │   ├── hooks/      # React Query hooks
 │       │   └── services/   # API integration
 │       └── public/
-├── smart-contracts/   # Blockchain integration (future)
-│   ├── contracts/     # Solidity contracts
-│   └── scripts/       # Deployment scripts
-├── docs/             # Documentation
+├── smart-contracts/          # Blockchain integration
+│   ├── chainlink-functions / # Chainlink Functions
+│   ├── src/                  # Solidity contracts
+│   └── scripts/              # Deployment scripts
+├── docs/               # Documentation
 ```
 
 ## 🔐 Security Features
@@ -222,7 +176,7 @@ wattwitness/
 2. **Verification:** Raspberry Pi receives signed data and verifies hardware signature
 3. **Storage:** Data is stored in PostgreSQL with verification status
 4. **Dashboard:** Real-time power readings and historical data visualization
-5. **Blockchain:** Verified data is submitted to blockchain via Chainlink Functions (future)
+5. **Blockchain:** Verified data is submitted to blockchain via Chainlink Functions
 
 ## 🎨 Dashboard Features
 
@@ -238,14 +192,3 @@ wattwitness/
 - **Energy Calculations:** Accurate production calculations
 - **Local Time Support:** Proper timezone handling
 - **Responsive Design:** Works on desktop and mobile
-
-## 🤝 Contributing
-
-This project is part of a hackathon. For integration work:
-- Use the API endpoints documented above
-- Test with the provided curl commands
-- Coordinate with the team for blockchain integration
-
-## 📄 License
-
-[Add your license information here] 
