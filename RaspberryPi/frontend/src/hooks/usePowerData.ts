@@ -1,7 +1,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef } from 'react';
 import { api, PowerReading } from '../services/api';
-import { useBlockchainData } from './useBlockchainData';
+// import { useBlockchainData } from './useBlockchainData';
 import { blockchainService } from '../services/blockchain';
 
 // Hook to get the first available installation ID

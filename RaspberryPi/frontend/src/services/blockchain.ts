@@ -12,7 +12,7 @@ const AVALANCHE_FUJI_RPC_OPTIONS = [
   'https://ava-testnet.public.blastapi.io/ext/bc/C/rpc' // Blast API
 ];
 
-const AVALANCHE_FUJI_RPC = AVALANCHE_FUJI_RPC_OPTIONS[0]; // Use your Infura endpoint
+// const AVALANCHE_FUJI_RPC = AVALANCHE_FUJI_RPC_OPTIONS[0]; // Use your Infura endpoint
 
 export interface ContractReading {
   readingId: number;
@@ -57,7 +57,7 @@ interface CacheEntry<T> {
 class BlockchainService {
   private provider!: ethers.providers.JsonRpcProvider;
   private contract!: ethers.Contract;
-  private eventListeners: Map<string, any> = new Map();
+  private _eventListeners: Map<string, any> = new Map();
   private currentRPCIndex: number = 0; // Start with Infura
   private cachedDeviceInfo: any = null; // Cache device info to avoid repeated API calls
   
@@ -582,7 +582,7 @@ class BlockchainService {
   // Get transaction details
   async getTransactionDetails(txHash: string) {
     try {
-      const tx = await this.provider.getTransaction(txHash);
+      // const tx = await this.provider.getTransaction(txHash);
       const receipt = await this.provider.getTransactionReceipt(txHash);
       const block = await this.provider.getBlock(receipt.blockNumber);
       

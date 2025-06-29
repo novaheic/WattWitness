@@ -14,7 +14,7 @@ export const useBlockchainData = (): UseBlockchainDataResult => {
   const [error, setError] = useState<string | null>(null);
   const [isRateLimited, setIsRateLimited] = useState(false);
   const [lastFetchTime, setLastFetchTime] = useState(0);
-  const [nextExpectedTx, setNextExpectedTx] = useState<Date | null>(null);
+  const [_nextExpectedTx, setNextExpectedTx] = useState<Date | null>(null);
 
   const fetchData = async (isInitialLoad: boolean = false) => {
     try {
