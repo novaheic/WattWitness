@@ -1,0 +1,15 @@
+[Unit]
+Description=WattWitness BatchProcessed Listener
+After=network.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/WattWitness
+# Activate the virtualenv and run module
+ExecStart=/bin/bash -c 'source /home/pi/.virtualenvs/wattwitness/bin/activate && python -m RaspberryPi.listener.main'
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target 
