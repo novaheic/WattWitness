@@ -221,5 +221,5 @@ void setup() {
 
 void loop() {
   fetchAndSignTelemetry();
-  delay(10000); // wait 10 seconds before repeating
+  delay(20000); // wait 20 seconds before repeating
 }
