@@ -4,6 +4,7 @@ pragma solidity 0.8.19;
 import {FunctionsClient} from "@chainlink/contracts/src/v0.8/functions/v1_0_0/FunctionsClient.sol";
 import {ConfirmedOwner} from "@chainlink/contracts/src/v0.8/shared/access/ConfirmedOwner.sol";
 import {FunctionsRequest} from "@chainlink/contracts/src/v0.8/functions/v1_0_0/libraries/FunctionsRequest.sol";
+import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 
 /**
  * @title WattWitnessDataLogger
@@ -189,12 +190,44 @@ contract WattWitnessDataLogger is FunctionsClient, ConfirmedOwner {
         bytes32 merkleRoot,
         bytes32[] calldata proof
     ) external pure returns (bool) {
-        // Create leaf hash for the reading
+        // Create leaf hash for the reading using keccak256
         bytes32 leaf = keccak256(abi.encodePacked(
             "[", readingId, ",", powerW, ",", totalWh, ",", timestamp, "]"
         ));
         
         return verifyMerkleProof(proof, merkleRoot, leaf);
+    }
+
+    /**
+     * @notice Verify a reading using merkle proof with SHA-256 (Chainlink Functions compatible)
+     * @param readingId The reading ID to verify
+     * @param powerW Power value in watts
+     * @param totalWh Total energy in watt-hours
+     * @param timestamp Reading timestamp
+     * @param merkleRoot The merkle root to verify against
+     * @param proof Merkle proof array
+     * @return True if the reading is valid
+     */
+    function verifyReadingSha256(
+        uint32 readingId,
+        uint32 powerW,
+        uint32 totalWh,
+        uint32 timestamp,
+        bytes32 merkleRoot,
+        bytes32[] calldata proof
+    ) external pure returns (bool) {
+        // Create leaf hash using SHA-256 to match Chainlink Functions
+        // Format: JSON.stringify([readingId, powerW, totalWh, timestamp])
+        string memory jsonStr = string(abi.encodePacked(
+            "[", Strings.toString(readingId), 
+            ",", Strings.toString(powerW),
+            ",", Strings.toString(totalWh),
+            ",", Strings.toString(timestamp), "]"
+        ));
+        
+        bytes32 leaf = sha256(bytes(jsonStr));
+        
+        return verifyMerkleProofSha256(proof, merkleRoot, leaf);
     }
 
     // View functions
@@ -345,7 +378,7 @@ contract WattWitnessDataLogger is FunctionsClient, ConfirmedOwner {
     }
 
     /**
-     * @notice Verify merkle proof
+     * @notice Verify merkle proof using keccak256
      * @param proof Merkle proof array
      * @param root Merkle root
      * @param leaf Leaf to verify
@@ -365,6 +398,29 @@ contract WattWitnessDataLogger is FunctionsClient, ConfirmedOwner {
             } else {
                 computedHash = keccak256(abi.encodePacked(proofElement, computedHash));
             }
+        }
+
+        return computedHash == root;
+    }
+
+    /**
+     * @notice Verify merkle proof using SHA-256 (matches Chainlink Functions)
+     * @param proof Merkle proof array
+     * @param root Merkle root
+     * @param leaf Leaf to verify
+     * @return True if proof is valid
+     */
+    function verifyMerkleProofSha256(
+        bytes32[] memory proof,
+        bytes32 root,
+        bytes32 leaf
+    ) internal pure returns (bool) {
+        bytes32 computedHash = leaf;
+
+        for (uint256 i = 0; i < proof.length; i++) {
+            bytes32 proofElement = proof[i];
+            // SHA-256 version: no sorting, preserve order from proof
+            computedHash = sha256(abi.encodePacked(computedHash, proofElement));
         }
 
         return computedHash == root;

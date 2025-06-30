@@ -2,7 +2,7 @@
 
 A Trustless Tamperproof Electricity Production Meter system for solar park tokenization. Ensures verifiable and immutable power production data through secure hardware measurements and integration of blockchain technology with Chainlink.
 
-When a new installation is set up, the WattWitnessDataLoggerFactory deploys a WattWitnessDataLogger contract, which stores all installation readings on-chain. During deployment, installation details are written to the contract’s state.
+When a new installation is set up, the WattWitnessDataLoggerFactory deploys a WattWitnessDataLogger contract, which stores all installation readings on-chain. During deployment, installation details are written to the contract's state.
 
 The WattWitness system uses Chainlink Automation to regularly trigger Chainlink Functions, which call our API to fetch 20 of the oldest pending readings not yet stored on-chain. The Chainlink Function then invokes the fulfillRequest fallback on the WattWitnessDataLogger, updating its Merkle Tree and emitting an event per reading.
 
@@ -298,3 +298,40 @@ For automatic data fetching, set up Chainlink Automation:
 - **Energy Calculations:** Accurate production calculations
 - **Local Time Support:** Proper timezone handling
 - **Responsive Design:** Works on desktop and mobile
+
+## Verifying an Individual Reading On-Chain  🚀
+
+```bash
+cd smart-contracts
+node script/verify-reading-sha256.js \
+  --logger 0x<LOGGER_CONTRACT_ADDRESS> \
+  --readingId <READING_ID> \
+  [--rpc <RPC_URL>]            # optional custom RPC endpoint
+```
+
+What the helper does:
+1. Locates the `BatchProcessed` event that contains your chosen `readingId`.
+2. Re-creates the Merkle tree **using the exact SHA-256 leaf and node hashing** employed by the Chainlink Functions script.
+3. Generates the correct sibling proof array for the reading.
+4. Calls `verifyReadingSha256()` on the contract via an `eth_call` and prints **✅  Valid** or **❌  Invalid**.
+
+<details>
+<summary>How it works under the hood</summary>
+
+1. Computes the leaf:
+   ```solidity
+   // JSON-style string, then SHA-256
+   sha256(bytes(string(abi.encodePacked(
+       "[", id, ",", powerW, ",", totalWh, ",", timestamp, "]")))
+   );
+   ```
+2. Builds the Merkle proof without leaf re-ordering (same as Chainlink Functions).
+3. Calls:
+   ```solidity
+   verifyReadingSha256(id, powerW, totalWh, timestamp, merkleRoot, proof);
+   ```
+4. A Foundry unit test (`test/MerkleVerifySha256.t.sol`) asserts that the on-chain helper accepts a correct proof.
+
+</details>
+
+> ℹ️  The legacy `verify-reading.js` and `test/MerkleVerify.t.sol` are kept for reference and to cover historic batches that used the older keccak256 encoding. For current deployments you should always use the SHA-256 version above.
