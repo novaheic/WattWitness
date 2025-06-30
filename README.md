@@ -39,12 +39,13 @@ A backend service listens for the BatchProcessed event from the WattWitnessDataL
 ### Avalanche Fuji Testnet
 - Chainlink Functions Testnet Subscription: https://functions.chain.link/fuji/15652
 
-- Deployment from earlier pre-factory deployment commit: 593d95538923d34f6e8f9c6fde4c5e505bbf9617
+- WattWitnessDataLoggerFactory: https://testnet.snowtrace.io/address/0xfF2dFA11605974C415992707BfD1D674f21C5edD
+- WattWitnessDataLogger: https://testnet.snowtrace.io/address/0xB3ee80a2B09727545939a059b24611Ee0dA32938
+- Chainlink Automation: https://automation.chain.link/fuji/0xed31c8b16e3707510451e312fc742491f0311f0faa5078f35923cb0c798e9e5c 
+
+- Deployment from earlier pre-factory deployment commit (contains same core logic): 593d95538923d34f6e8f9c6fde4c5e505bbf9617
 - WattWitnessDataLogger: https://testnet.snowtrace.io/address/0x7189D2b09691a8867056a228fb3e227e12E5B105 
 - Chainlink Automation: https://automation.chain.link/fuji/24931883708556152898690156269086035823652004846924398997064749746579524676622
-
-- WattWitnessDataLoggerFactory: https://testnet.snowtrace.io/address/0xAC8A0a99B946C026F259318791f8D3A63357D1cA
-- WattWitnessDataLogger: https://testnet.snowtrace.io/address/0x3cB19ea42e7D12d4Df87575cD96B881D8Ef99D36 
 
 ## API Access
 
@@ -111,7 +112,7 @@ A backend service listens for the BatchProcessed event from the WattWitnessDataL
 }
 ```
 
-## 🏗️ System Architecture
+## System Architecture
 
 ### Hardware Components
 - **Secure Measurement Hardware (ESP32)**
