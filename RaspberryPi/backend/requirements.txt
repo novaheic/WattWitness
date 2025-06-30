@@ -9,4 +9,6 @@ pytest==7.4.3
 httpx==0.25.2
 python-jose==3.3.0
 passlib==1.7.4
-python-multipart==0.0.6 
+python-multipart==0.0.6
+web3>=6.9.0
+eth-account>=0.10.0 

@@ -6,8 +6,9 @@
 # 
 # This script will:
 # 1) Validate your environment setup
-# 2) Deploy WattWitnessDataLogger contract
-# 3) Verify the contract on Snowtrace
+# 2) Deploy logger via WattWitnessLoggerFactory (if FACTORY_ADDRESS provided)
+#    or deploy both factory and logger if not.
+# 3) Verify newly deployed contracts on Snowtrace
 # 4) Guide you through Chainlink Functions setup
 # 5) Provide next steps for automation setup
 #
@@ -43,6 +44,7 @@ set +a
 
 # Validate required environment variables
 echo "✅ Validating environment setup..."
+# If FACTORY_ADDRESS is not provided we will deploy it.
 REQUIRED_VARS=("DEPLOYER_PRIVATE_KEY" "CHAINLINK_FUNCTIONS_SUBSCRIPTION_ID")
 MISSING_VARS=()
 
@@ -71,53 +73,102 @@ fi
 echo "✅ Environment validation complete!"
 echo ""
 
-# Check if Foundry is installed
+# Check if Foundry is installed (forge & cast)
 if ! command -v forge &> /dev/null; then
     echo "❌ Foundry not found!"
     echo "💡 Please install Foundry: https://book.getfoundry.sh/getting-started/installation"
     exit 1
 fi
 
-SCRIPT_NAME="DeployCompressedWattWitness"
-SCRIPT_PATH="script/DeployWattWitnessDataLogger.s.sol:${SCRIPT_NAME}"
+# Ensure cast present
+if ! command -v cast &> /dev/null; then
+    echo "❌ 'cast' (Foundry) not found!"
+    exit 1
+fi
 
-echo "🚀 Deploying WattWitnessDataLogger on $NETWORK..."
-echo "📋 Contract will be configured with:"
-echo "   - Subscription ID: $CHAINLINK_FUNCTIONS_SUBSCRIPTION_ID"
-echo "   - Network: $NETWORK"
-echo "   - Gas Limit: 300,000"
-echo ""
+# ---------------------------------------------------------------------
+# 1) Deploy factory if needed
+# ---------------------------------------------------------------------
 
-DEPLOY_OUTPUT=$(forge script "$SCRIPT_PATH" \
-  --rpc-url "$NETWORK" \
-  --broadcast \
-  --verify)
+if [ -z "${FACTORY_ADDRESS:-}" ]; then
+  echo "🏗  No FACTORY_ADDRESS provided – deploying WattWitnessLoggerFactory..."
+  FACTORY_SCRIPT="script/DeployLoggerFactory.s.sol:DeployLoggerFactory"
 
-echo "$DEPLOY_OUTPUT"
+  FACTORY_OUTPUT=$(forge script "$FACTORY_SCRIPT" \
+      --rpc-url "$AVALANCHE_FUJI_RPC" \
+      --private-key "$DEPLOYER_PRIVATE_KEY" \
+      --broadcast)
 
-# Extract contract address from output
-CONTRACT_ADDRESS=$(echo "$DEPLOY_OUTPUT" | grep -E "Contract Address:" | grep -oE "0x[a-fA-F0-9]{40}" | tail -1)
+  FACTORY_ADDRESS=$(echo "$FACTORY_OUTPUT" | grep -E "LoggerFactory deployed at:" | grep -oE "0x[a-fA-F0-9]{40}" | tail -1)
 
-if [ -z "$CONTRACT_ADDRESS" ]; then
-  echo "❌ Unable to parse contract address from deployment output" >&2
+  if [ -z "$FACTORY_ADDRESS" ]; then
+      echo "❌ Unable to parse factory address from output" >&2
+      exit 1
+  fi
+
+  echo "✅ Factory deployed at $FACTORY_ADDRESS"
+
+  # Persist in .env
+  if ! grep -q "FACTORY_ADDRESS" .env; then
+      echo "FACTORY_ADDRESS=$FACTORY_ADDRESS" >> .env
+  else
+      sed -i.bak "s/FACTORY_ADDRESS=.*/FACTORY_ADDRESS=$FACTORY_ADDRESS/" .env
+  fi
+else
+  if [[ ! $FACTORY_ADDRESS =~ ^0x[0-9a-fA-F]{40}$ ]]; then
+    echo "❌ FACTORY_ADDRESS '$FACTORY_ADDRESS' is not a valid 42-char hex address" >&2
+    exit 1
+  fi
+  echo "🏭 Using existing factory at $FACTORY_ADDRESS"
+fi
+
+# ---------------------------------------------------------------------
+# 2) Deploy WattWitnessDataLogger via factory
+# ---------------------------------------------------------------------
+
+INSTALLATION_ID="${INSTALLATION_ID:-1}"
+INSTALLATION_NAME="${INSTALLATION_NAME:-Demo Site}"
+SHELLY_MAC="${SHELLY_MAC:-ABCDEF123456}"
+PUBLIC_KEY="${PUBLIC_KEY:-deadbeef}"
+CREATED_AT="${CREATED_AT:-$(date +%s)}"
+IS_ACTIVE="${IS_ACTIVE:-true}"
+
+echo "🚀 Deploying WattWitnessDataLogger via factory..."
+
+TX_HASH=$(cast send "$FACTORY_ADDRESS" \
+  "createLogger(uint32,string,string,string,uint256,bool)" \
+  "$INSTALLATION_ID" "$INSTALLATION_NAME" "$SHELLY_MAC" "$PUBLIC_KEY" "$CREATED_AT" "$IS_ACTIVE" \
+  --private-key "$DEPLOYER_PRIVATE_KEY" \
+  --rpc-url "$AVALANCHE_FUJI_RPC")
+
+echo "⏳ Waiting for transaction $TX_HASH to be mined..."
+cast receipt "$TX_HASH" --rpc-url "$AVALANCHE_FUJI_RPC" -n 1 >/dev/null 2>&1 || true
+
+LOGGER_ADDRESS=$(cast call "$FACTORY_ADDRESS" "loggers(uint32)(address)" "$INSTALLATION_ID" --rpc-url "$AVALANCHE_FUJI_RPC")
+
+if [ -z "$LOGGER_ADDRESS" ] || [ "$LOGGER_ADDRESS" == "0x0000000000000000000000000000000000000000" ]; then
+  echo "❌ Logger deployment failed or not found in factory mapping." >&2
   exit 1
 fi
 
-echo ""
-echo "🎉 DEPLOYMENT SUCCESSFUL!"
-echo "========================"
-echo "✅ Contract Address: $CONTRACT_ADDRESS"
-echo "🔗 Snowtrace: https://testnet.snowtrace.io/address/$CONTRACT_ADDRESS#code"
-echo ""
+echo "🎉 Logger deployed!"
+echo "==================="
+echo "✅ DataLogger Address: $LOGGER_ADDRESS"
+echo "🔗 Snowtrace: https://testnet.snowtrace.io/address/$LOGGER_ADDRESS#code"
 
-# Save contract address to .env for future use
+# Save to .env
 if ! grep -q "WATTWITNESS_CONTRACT_ADDRESS" .env; then
-    echo "WATTWITNESS_CONTRACT_ADDRESS=$CONTRACT_ADDRESS" >> .env
-    echo "💾 Contract address saved to .env file"
+    echo "WATTWITNESS_CONTRACT_ADDRESS=$LOGGER_ADDRESS" >> .env
 else
-    sed -i.bak "s/WATTWITNESS_CONTRACT_ADDRESS=.*/WATTWITNESS_CONTRACT_ADDRESS=$CONTRACT_ADDRESS/" .env
-    echo "💾 Contract address updated in .env file"
+    sed -i.bak "s/WATTWITNESS_CONTRACT_ADDRESS=.*/WATTWITNESS_CONTRACT_ADDRESS=$LOGGER_ADDRESS/" .env
 fi
+
+echo ""
+echo "📋 Remember to add the logger as a consumer to your Chainlink Functions subscription ($CHAINLINK_FUNCTIONS_SUBSCRIPTION_ID)."
+echo ""
+# ---------------------------------------------------------------------
+# 3) Chainlink Functions setup guidance (unchanged below)
+# ---------------------------------------------------------------------
 
 echo ""
 echo "🔗 CHAINLINK FUNCTIONS SETUP REQUIRED"
@@ -127,7 +178,7 @@ echo ""
 echo "📋 STEP 1: Add Consumer to Subscription"
 echo "1. Go to: https://functions.chain.link/avalanche-fuji/$CHAINLINK_FUNCTIONS_SUBSCRIPTION_ID"
 echo "2. Click 'Add consumer'"
-echo "3. Enter contract address: $CONTRACT_ADDRESS"
+echo "3. Enter contract address: $LOGGER_ADDRESS"
 echo "4. Confirm the transaction"
 echo ""
 echo "💰 STEP 2: Fund Your Subscription"
@@ -140,7 +191,7 @@ echo ""
 echo "🤖 STEP 4: Setup Automation (Optional)"
 echo "For automatic data fetching, set up Chainlink Automation:"
 echo "1. Go to: https://automation.chain.link/avalanche-fuji"
-echo "2. Create new upkeep with contract address: $CONTRACT_ADDRESS"
+echo "2. Create new upkeep with contract address: $LOGGER_ADDRESS"
 echo "3. Set interval (recommended: 300 seconds / 5 minutes)"
 echo "4. Fund with LINK tokens"
 echo ""
