@@ -1,6 +1,6 @@
 """WattWitness BatchProcessed listener (inside RaspberryPi folder).
 Run with:
-   python -m RaspberryPi.listener.main [--once]
+   python -m RaspberryPi.listener.main [--once] [--address CONTRACT_ADDRESS]
 """
 from __future__ import annotations
 
@@ -27,13 +27,13 @@ def _init_web3() -> Web3:
     return w3
 
 
-def _load_contract(w3: Web3) -> Contract:
-    return w3.eth.contract(address=Web3.to_checksum_address(config.CONTRACT_ADDRESS), abi=ABI)
+def _load_contract(w3: Web3, contract_address: str) -> Contract:
+    return w3.eth.contract(address=Web3.to_checksum_address(contract_address), abi=ABI)
 
 
 @retry(wait=wait_exponential(multiplier=1, min=2, max=30), stop=stop_after_attempt(5), retry=retry_if_exception_type((requests.RequestException,)))
 def _post_mark_on_chain(payload: dict[str, Any]) -> None:
-    url = f"{config.API_BASE_URL.rstrip('/')}/readings/mark-on-chain"
+    url = f"{config.API_BASE_URL.rstrip('/')}/api/v1/readings/mark-on-chain"
     resp = requests.post(url, json=payload, timeout=config.REQUEST_TIMEOUT)
     if resp.status_code >= 400:
         raise requests.HTTPError(f"Backend responded with {resp.status_code}: {resp.text}", response=resp)
@@ -86,10 +86,26 @@ def _event_loop(contract: Contract) -> None:
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description="Listener for WattWitness BatchProcessed events")
     parser.add_argument("--once", action="store_true", help="connectivity test")
+    parser.add_argument("--address", help="Override contract address")
     args = parser.parse_args(argv)
 
+    # Determine contract address
+    if args.address:
+        contract_address = args.address
+        print(f"[CONFIG] Using provided contract address: {contract_address}")
+    elif config.CONTRACT_ADDRESS:
+        contract_address = config.CONTRACT_ADDRESS
+        print(f"[CONFIG] Using configured contract address: {contract_address}")
+    else:
+        print("[ERR] No contract address configured!")
+        print("[ERR] Please set CONTRACT_ADDRESS in .env file or use --address flag")
+        print("[ERR] Example .env entry: CONTRACT_ADDRESS=0x6A4E5cD0C47c006D95d6e360Ff5d7Af8a09538D8")
+        sys.exit(1)
+
     w3 = _init_web3()
-    contract = _load_contract(w3)
+    contract = _load_contract(w3, contract_address)
+    print(f"[CONFIG] Monitoring contract: {contract_address}")
+    
     if args.once:
         print("Connectivity OK. Exiting.")
         return

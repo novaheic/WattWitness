@@ -111,6 +111,60 @@ def get_installations(db: Session = Depends(get_db)):
         for installation in installations
     ]
 
+@router.get("/installations/{installation_id}", response_model=InstallationResponse)
+def get_installation(installation_id: int, db: Session = Depends(get_db)):
+    """Get a specific installation by ID"""
+    installation = db.query(SolarInstallation).filter(SolarInstallation.id == installation_id).first()
+    if not installation:
+        raise HTTPException(status_code=404, detail="Installation not found")
+    
+    return InstallationResponse(
+        id=installation.id,
+        name=installation.name,
+        shelly_mac=installation.shelly_mac,
+        public_key=installation.public_key,
+        last_boot_timestamp=installation.last_boot_timestamp,
+        created_at=installation.created_at,
+        is_active=installation.is_active,
+        logger_contract_address=installation.logger_contract_address,
+        deployment_tx_hash=installation.deployment_tx_hash
+    )
+
+class InstallationUpdate(BaseModel):
+    logger_contract_address: str = None
+    deployment_tx_hash: str = None
+    is_active: bool = None
+
+@router.patch("/installations/{installation_id}")
+def update_installation(installation_id: int, update: InstallationUpdate, db: Session = Depends(get_db)):
+    """Update specific fields of an installation"""
+    installation = db.query(SolarInstallation).filter(SolarInstallation.id == installation_id).first()
+    if not installation:
+        raise HTTPException(status_code=404, detail="Installation not found")
+    
+    # Update only provided fields
+    if update.logger_contract_address is not None:
+        installation.logger_contract_address = update.logger_contract_address
+    if update.deployment_tx_hash is not None:
+        installation.deployment_tx_hash = update.deployment_tx_hash
+    if update.is_active is not None:
+        installation.is_active = update.is_active
+    
+    db.commit()
+    db.refresh(installation)
+    
+    return InstallationResponse(
+        id=installation.id,
+        name=installation.name,
+        shelly_mac=installation.shelly_mac,
+        public_key=installation.public_key,
+        last_boot_timestamp=installation.last_boot_timestamp,
+        created_at=installation.created_at,
+        is_active=installation.is_active,
+        logger_contract_address=installation.logger_contract_address,
+        deployment_tx_hash=installation.deployment_tx_hash
+    )
+
 @router.post("/installations/")
 def create_installation(installation: InstallationCreate, db: Session = Depends(get_db)):
     """Create a new solar installation (called once at ESP32 startup)"""

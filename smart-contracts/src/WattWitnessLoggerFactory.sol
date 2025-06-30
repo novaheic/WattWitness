@@ -53,6 +53,22 @@ contract WattWitnessLoggerFactory is ConfirmedOwner {
 
         loggers[installationId] = address(newLogger);
         emit LoggerCreated(installationId, address(newLogger), name, shellyMac);
+        
+        // Transfer ownership to the caller (typically the backend wallet)
+        newLogger.transferOwnership(msg.sender);
+        
         return address(newLogger);
+    }
+
+    /**
+     * @notice Transfer ownership of a logger to a new owner
+     * @dev Only factory owner can call this
+     */
+    function transferLoggerOwnership(uint32 installationId, address newOwner) external onlyOwner {
+        address loggerAddr = loggers[installationId];
+        require(loggerAddr != address(0), "Logger not found");
+        
+        WattWitnessDataLogger logger = WattWitnessDataLogger(loggerAddr);
+        logger.transferOwnership(newOwner);
     }
 } 
