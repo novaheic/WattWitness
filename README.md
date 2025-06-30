@@ -43,7 +43,7 @@ A backend service listens for the BatchProcessed event from the WattWitnessDataL
 - WattWitnessDataLogger: https://testnet.snowtrace.io/address/0xB3ee80a2B09727545939a059b24611Ee0dA32938
 - Chainlink Automation: https://automation.chain.link/fuji/0xed31c8b16e3707510451e312fc742491f0311f0faa5078f35923cb0c798e9e5c 
 
-- Deployment from earlier pre-factory deployment commit (contains same core logic): 593d95538923d34f6e8f9c6fde4c5e505bbf9617
+- Deployment from earlier pre-factory deployment commit (contains same core logic): 
 - WattWitnessDataLogger: https://testnet.snowtrace.io/address/0x7189D2b09691a8867056a228fb3e227e12E5B105 
 - Chainlink Automation: https://automation.chain.link/fuji/24931883708556152898690156269086035823652004846924398997064749746579524676622
 
