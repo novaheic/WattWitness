@@ -2,7 +2,15 @@
 
 A Trustless Tamperproof Electricity Production Meter system for solar park tokenization. Ensures verifiable and immutable power production data through secure hardware measurements and integration of blockchain technology with Chainlink.
 
-## 🎯 Key Features
+When a new installation is set up, the WattWitnessDataLoggerFactory deploys a WattWitnessDataLogger contract, which stores all installation readings on-chain. During deployment, installation details are written to the contract’s state.
+
+The WattWitness system uses Chainlink Automation to regularly trigger Chainlink Functions, which call our API to fetch 20 of the oldest pending readings not yet stored on-chain. The Chainlink Function then invokes the fulfillRequest fallback on the WattWitnessDataLogger, updating its Merkle Tree and emitting an event per reading.
+
+Due to Chainlink Functions Server Limits (256-byte return size and 300,000 gas callback limit), we cannot store all reading data directly as state variables. Instead, readings are compacted into a Merkle Tree with key data, and events are emitted for easy access by applications and front ends.
+
+A backend service listens for the BatchProcessed event from the WattWitnessDataLogger. When triggered, it marks the relevant readings as is_on_chain = true and records the transaction hash and block number.
+
+## Key Features
 
 ### **Real-Time Dashboard**
 - **Live Power Output:** Current power production with real-time updates
@@ -29,9 +37,15 @@ A Trustless Tamperproof Electricity Production Meter system for solar park token
 ## Deployed Contracts
 
 ### Avalanche Fuji Testnet
-WattWitnessDataLogger: 0x7189D2b09691a8867056a228fb3e227e12E5B105
+- Chainlink Functions Testnet Subscription: https://functions.chain.link/fuji/15652
 
-## 📡 API Access
+- WattWitnessDataLogger (Pre-Factory Deploy): https://testnet.snowtrace.io/address/0x7189D2b09691a8867056a228fb3e227e12E5B105 
+- Chainlink Automation: https://automation.chain.link/fuji/24931883708556152898690156269086035823652004846924398997064749746579524676622
+
+- WattWitnessDataLoggerFactory: https://testnet.snowtrace.io/address/0xAC8A0a99B946C026F259318791f8D3A63357D1cA
+- WattWitnessDataLogger: https://testnet.snowtrace.io/address/0x3cB19ea42e7D12d4Df87575cD96B881D8Ef99D36 
+
+## API Access
 
 **Backend URL:** `http://localhost:8000` (development) / `https://wattwitness-api.loca.lt/` (production)  
 **WattWitnessAPI Documentation:** `https://wattwitness-api.loca.lt/docs`
@@ -136,7 +150,7 @@ wattwitness/
     └── script/               # Deployment & Testing scripts
 ```
 
-## 🔐 Security Features
+## Security Features
 
 - Hardware-level cryptographic signing with ATECC608A
 - API authentication and validation
@@ -144,7 +158,19 @@ wattwitness/
 - Secure key storage and management
 - Data verification at multiple levels
 
-## 🚀 Getting Started
+## Environment Files
+
+This repository uses several separate `.env` files – make sure you are editing the right one for each component.
+
+| Path | Purpose | Key variables |
+| ---- | ------- | ------------- |
+| `smart-contracts/.env` | Deploying & configuring on-chain contracts | `DEPLOYER_PRIVATE_KEY`, `CHAINLINK_FUNCTIONS_SUBSCRIPTION_ID`, `AVALANCHE_FUJI_RPC`, … |
+| `RaspberryPi/backend/.env` | FastAPI backend configuration | `DATABASE_URL`, `CHAIN_RPC_URL`, any email / auth secrets… |
+| `RaspberryPi/listener/.env` | Raspberry Pi listener that watches `BatchProcessed` events | `RPC_URL`, `CONTRACT_ADDRESS`, `API_BASE_URL`, `REQUEST_TIMEOUT` |
+
+Whenever the docs mention "the `.env` file", refer to this table and update the correct one.
+
+## Getting Started
 
 ### Prerequisites
 - Python 3.10+
@@ -180,12 +206,75 @@ wattwitness/
 6. Flash ESP32 and power independently
 
 ### Smart Contract Deployment
-1. Setup /smart-contracts/.env
-2. Deploy and verify the contracts with `deploy-wattwitness.sh`
-3. Add the deployed contract as a consumer of a Chainlink Functions subscription
-4. Setup the contract to fire every 5 minutes with Chainlink Automation
+See SMART_CONTRACTS_README.md for further info.
 
-## 📊 Data Flow
+## Prerequisites
+
+Before you begin, ensure you have:
+
+1. **Foundry** installed: https://book.getfoundry.sh/getting-started/installation
+2. **Node.js** (v16+) and **npm** for some utilities
+3. **Avalanche Fuji testnet AVAX** for gas fees
+4. **Chainlink Functions subscription** with LINK tokens
+5. **Private key** for deployment (never share this!)
+
+## Quick Start
+
+### Step 1: Environment Setup
+
+1. Clone the repository and navigate to smart contracts:
+```bash
+cd smart-contracts
+```
+
+2. Create a `.env` file with your configuration at /smart-contracts/.env. Use `.env.example` as a template.
+```bash
+# Required variables
+DEPLOYER_PRIVATE_KEY=0x1234567890abcdef...  # Your private key (never share!)
+CHAINLINK_FUNCTIONS_SUBSCRIPTION_ID=123     # Your Chainlink Functions subscription ID
+
+# Optional (defaults provided)
+AVALANCHE_FUJI_RPC=https://avalanche-fuji-c-chain-rpc.publicnode.com
+```
+
+### Step 2: Deploy the Contract
+
+Run the deployment script:
+```bash
+./script/deploy-wattwitness.sh
+```
+
+This script will:
+- ✅ Validate your environment setup
+- ✅ Deploy WattWitnessDataLogger contract
+- ✅ Verify the contract on Snowtrace
+- ✅ Save the contract address to your `.env` file
+- ✅ Provide next steps for Chainlink setup
+
+### Step 3: Chainlink Functions Setup
+
+After deployment, you need to add your contract as a consumer to your Chainlink Functions subscription:
+
+1. **Add Consumer**: Go to https://functions.chain.link/avalanche-fuji/[YOUR_SUBSCRIPTION_ID]
+2. Click "Add consumer"
+3. Enter your deployed contract address
+4. Confirm the transaction
+
+### Step 4: Chainlink Automation
+
+For automatic data fetching, set up Chainlink Automation:
+
+1. Go to https://automation.chain.link/avalanche-fuji
+2. Click "Register new upkeep"
+3. Choose "Custom logic" upkeep
+4. Enter your contract address
+5. Set upkeep name: "WattWitness Data Fetcher"
+6. Set gas limit: 2,000,000
+7. Set starting balance: 5 LINK
+8. Set interval: 300 seconds (5 minutes)
+9. Complete registration and fund the upkeep
+
+## Data Flow
 
 1. **Measurement:** Secure hardware measures power data and cryptographically signs it
 2. **Verification:** Raspberry Pi receives signed data and verifies hardware signature
@@ -193,7 +282,7 @@ wattwitness/
 4. **Dashboard:** Real-time power readings and historical data visualization
 5. **Blockchain:** Verified data is submitted to blockchain via Chainlink Functions
 
-## 🎨 Dashboard Features
+## Dashboard Features
 
 ### Real-Time Monitoring
 - **Power Output:** Live current power production

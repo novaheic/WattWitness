@@ -2,102 +2,15 @@
 
 WattWitness is a decentralized solar energy monitoring system that uses Chainlink Functions to fetch real-time solar power data and store it on-chain with merkle tree batch processing for unlimited scalability.
 
-## 🌟 Features
-
-- **Chainlink Functions Integration**: Fetches solar data from WattWitness API
-- **Merkle Tree Batch Processing**: Unlimited scalability with 256-byte response limit
-- **Event-Driven Storage**: Gas-efficient individual reading events
-- **160-Byte Optimized Responses**: 62.5% of Chainlink's 256-byte limit
-- **Automatic Verification**: Smart contract verification on Snowtrace
-- **Mock Data Fallback**: Reliable operation even when API is unavailable
-
-## 📋 Prerequisites
-
-Before you begin, ensure you have:
-
-1. **Foundry** installed: https://book.getfoundry.sh/getting-started/installation
-2. **Node.js** (v16+) and **npm** for some utilities
-3. **Avalanche Fuji testnet AVAX** for gas fees
-4. **Chainlink Functions subscription** with LINK tokens
-5. **Private key** for deployment (never share this!)
-
-## 🚀 Quick Start
-
-### Step 1: Environment Setup
-
-1. Clone the repository and navigate to smart contracts:
-```bash
-cd smart-contracts
-```
-
-2. Create a `.env` file with your configuration:. Use `.env.example` as a template.
-```bash
-# Required variables
-DEPLOYER_PRIVATE_KEY=0x1234567890abcdef...  # Your private key (never share!)
-CHAINLINK_FUNCTIONS_SUBSCRIPTION_ID=123     # Your Chainlink Functions subscription ID
-
-# Optional (defaults provided)
-AVALANCHE_FUJI_RPC=https://avalanche-fuji-c-chain-rpc.publicnode.com
-```
-
-### Step 2: Deploy the Contract
-
-Run the deployment script:
-```bash
-./script/deploy-wattwitness.sh
-```
-
-This script will:
-- ✅ Validate your environment setup
-- ✅ Deploy WattWitnessDataLogger contract
-- ✅ Verify the contract on Snowtrace
-- ✅ Save the contract address to your `.env` file
-- ✅ Provide next steps for Chainlink setup
-
-### Step 3: Chainlink Functions Setup
-
-After deployment, you need to add your contract as a consumer to your Chainlink Functions subscription:
-
-1. **Add Consumer**: Go to https://functions.chain.link/avalanche-fuji/[YOUR_SUBSCRIPTION_ID]
-2. Click "Add consumer"
-3. Enter your deployed contract address
-4. Confirm the transaction
-
-### Step 4: Chainlink Automation
-
-For automatic data fetching, set up Chainlink Automation:
-
-1. Go to https://automation.chain.link/avalanche-fuji
-2. Click "Register new upkeep"
-3. Choose "Custom logic" upkeep
-4. Enter your contract address
-5. Set upkeep name: "WattWitness Data Fetcher"
-6. Set gas limit: 2,000,000
-7. Set starting balance: 5 LINK
-8. Set interval: 300 seconds (5 minutes)
-9. Complete registration and fund the upkeep
-
-
-## 🔧 Configuration
-
-### Environment Variables
-
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `DEPLOYER_PRIVATE_KEY` | Your deploying wallet private key | - |
-| `CHAINLINK_FUNCTIONS_SUBSCRIPTION_ID` | Your Chainlink Functions subscription ID | - |
-| `AVALANCHE_FUJI_RPC` | Avalanche Fuji RPC URL | `https://api.avax-test.network/ext/bc/C/rpc` |
-| `WATTWITNESS_API_URL` | Deployed WattWitness API URL (auto-saved) | - |
-
 ### Contract Configuration
 
 The deployed contract is automatically configured with:
-- **Gas Limit**: 300,000 (maximum for Chainlink Functions)
+- **Gas Limit**: 300,000 (maximum for Chainlink Functions callback)
 - **DON ID**: `fun-avalanche-fuji-1`
 - **Batch Size**: 20 readings per batch (adjustable)
 - **Response Format**: 160 bytes (merkle root + latest reading)
 
-## 📊 Monitoring and Testing
+## Monitoring and Testing
 
 ### Manual Testing
 
@@ -128,7 +41,7 @@ cast call $WATTWITNESS_CONTRACT_ADDRESS "getLatestResponse()" --rpc-url $AVALANC
 cast call $WATTWITNESS_CONTRACT_ADDRESS "getLatestBatchInfo()" --rpc-url $AVALANCHE_FUJI_RPC
 ```
 
-## 🏗️ Architecture
+## Architecture
 
 ### Smart Contract Structure
 
@@ -160,7 +73,7 @@ Bytes 96-127: Total Energy in Wh (32 bytes)
 Bytes 128-159: Timestamp (32 bytes)
 ```
 
-## 🛠️ Development
+## Development
 
 ### Building
 
@@ -174,7 +87,7 @@ forge build
 forge test
 ```
 
-## 🔍 Troubleshooting
+## Troubleshooting
 
 ### Common Issues
 
